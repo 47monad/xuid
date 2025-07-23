@@ -1,3 +1,23 @@
+// Package xuid provides a compact, type-safe identifier system built on UUIDs.
+//
+// XUID combines the robustness of UUIDs with practical enhancements:
+// - Sortable identifiers using UUIDv7 for chronological ordering
+// - Optional string prefixes for human-readable context (e.g., "user_", "order_")
+// - Base58 encoding for shorter, URL-safe representations
+// - Built-in JSON marshaling and unmarshaling support
+//
+// Example usage:
+//
+//	// Create a sortable identifier with prefix
+//	userID := xuid.MustNewSortable("user")
+//	fmt.Println(userID.String()) // user_8M7Qq2vR3kGbF9wN5pL2xA
+//
+//	// Parse from string
+//	parsed, err := xuid.Parse("user_8M7Qq2vR3kGbF9wN5pL2xA")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Println(parsed.GetPrefix()) // user
 package xuid
 
 import (
@@ -49,6 +69,10 @@ func NewRandom(prefix string) (XUID, error) {
 		uuid:   id,
 		prefix: prefix,
 	}, nil
+}
+
+func MustNewRandom(prefix string) XUID {
+	return Must(NewRandom(prefix))
 }
 
 func NilUUID() (XUID, error) {
