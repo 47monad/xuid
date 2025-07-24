@@ -95,6 +95,13 @@ func (x XUID) GetPrefix() string {
 	return x.prefix
 }
 
+// SetPrefix sets the prefix field to the specified prefix.
+// This is useful when loading XUIDs from database and need to restore the prefix.
+func (x *XUID) SetPrefix(prefix string) *XUID {
+	x.prefix = prefix
+	return x
+}
+
 func (x XUID) String() string {
 	b, _ := x.uuid.MarshalBinary()
 	if x.prefix == "" {

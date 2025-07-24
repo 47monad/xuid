@@ -9,6 +9,7 @@ A Go package for generating compact, sortable UUID-based identifiers with option
 - 🏷️ **Optional Prefixes**: Add human-readable prefixes to your identifiers (e.g., `user_`, `order_`)
 - 📦 **Compact Encoding**: Uses base58 encoding for shorter, URL-safe strings
 - 🔄 **JSON Support**: Built-in JSON marshaling and unmarshaling
+- 🗄️ **SQL Database Support**: Seamless integration with SQL databases (PostgreSQL, MySQL, etc.)
 - ✅ **Type Safety**: Strong typing with validation and parsing utilities
 
 ## Installation
@@ -165,6 +166,13 @@ data, _ := json.Marshal(user)
 var parsed User
 json.Unmarshal(data, &parsed)
 ```
+
+### SQL Support
+
+XUIDs integrate seamlessly with SQL databases such as PostgreSQL and MySQL. However, there are a few caveats to keep in mind:
+
+- **Only the UUID bytes are stored** — The 16-byte UUID is stored in the database as a []byte (e.g., BYTEA in PostgreSQL or BINARY(16) in MySQL). This ensures efficient storage and indexing.
+- **Prefixes are not stored** — If your application relies on the XUID prefix (e.g., "file_", "user_") for querying or categorization, you’ll need to store the prefix in a separate column.
 
 ## Format
 

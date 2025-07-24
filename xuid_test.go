@@ -409,6 +409,24 @@ func TestGetters(t *testing.T) {
 	})
 }
 
+func TestSetters(t *testing.T) {
+	t.Run("SetPrefix sets prefix to XUID without prefix", func(t *testing.T) {
+		testXUID, _ := xuid.NewSortable("")
+
+		testXUID.SetPrefix("user")
+
+		assert.Equal(t, "user", testXUID.GetPrefix())
+	})
+
+	t.Run("SetPrefix replaces existing prefix", func(t *testing.T) {
+		testXUID, _ := xuid.NewSortable("old")
+
+		testXUID.SetPrefix("new")
+
+		assert.Equal(t, "new", testXUID.GetPrefix()) // Original unchanged
+	})
+}
+
 func TestEdgeCases(t *testing.T) {
 	t.Run("handles empty prefix consistently", func(t *testing.T) {
 		id1, _ := xuid.NewSortable("")
@@ -494,4 +512,14 @@ func BenchmarkJSONUnmarshal(b *testing.B) {
 		var parsed xuid.XUID
 		_ = json.Unmarshal(data, &parsed)
 	}
+}
+
+func BenchmarkSetPrefix(b *testing.B) {
+	id := xuid.MustNewSortable("bench")
+
+	b.Run("SetPrefixPrefix", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = id.SetPrefix("bench")
+		}
+	})
 }
