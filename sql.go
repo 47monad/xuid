@@ -13,7 +13,7 @@ func (x XUID) Value() (driver.Value, error) {
 	if x.uuid == uuid.Nil {
 		return nil, nil
 	}
-	return x.uuid[:], nil
+	return x.uuid.String(), nil
 }
 
 // Scan implements the sql.Scanner interface.
@@ -27,11 +27,23 @@ func (x *XUID) Scan(value interface{}) error {
 		return nil
 	}
 
-	b, ok := value.([]byte)
-	if !ok || len(b) != 16 {
-		return errors.New("failed to scan from database. Invalid XUID bytes")
+	switch d := value.(type) {
+	case string:
+		id, err := uuid.Parse(d)
+		if err != nil {
+			return errors.New("failed to scan from database. Invalid XUID string")
+		}
+		copy(x.uuid[:], id[:])
+		x.prefix = ""
+		return nil
+	case []byte:
+		if len(d) != 16 {
+			return errors.New("failed to scan from database. Invalid XUID bytes")
+		}
+		copy(x.uuid[:], d)
+		x.prefix = "" // Prefix is lost when loading from database
+		return nil
 	}
-	copy(x.uuid[:], b)
-	x.prefix = "" // Prefix is lost when loading from database
-	return nil
+
+	return errors.New("unsupported type to scan as sql value")
 }

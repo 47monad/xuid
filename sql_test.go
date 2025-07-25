@@ -19,7 +19,7 @@ func TestXUIDValue(t *testing.T) {
 		value, err := id.Value()
 
 		require.NoError(t, err)
-		assert.Equal(t, testUUID[:], value)
+		assert.Equal(t, testUUID.String(), value)
 	})
 
 	t.Run("returns nil for nil UUID", func(t *testing.T) {
@@ -50,6 +50,17 @@ func TestXUIDValue(t *testing.T) {
 }
 
 func TestXUIDScan(t *testing.T) {
+	t.Run("scans UUID string successfully", func(t *testing.T) {
+		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
+		var id xuid.XUID
+
+		err := id.Scan(testUUID.String())
+
+		require.NoError(t, err)
+		assert.Equal(t, testUUID, id.GetUUID())
+		assert.Equal(t, "", id.GetPrefix()) // Prefix is lost when scanning
+	})
+
 	t.Run("scans UUID byte slice successfully", func(t *testing.T) {
 		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
 		var id xuid.XUID
@@ -78,7 +89,7 @@ func TestXUIDScan(t *testing.T) {
 		err := id.Scan("invalid-xuid-format")
 
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Invalid XUID bytes")
+		assert.Contains(t, err.Error(), "Invalid XUID string")
 	})
 
 	t.Run("implements sql.Scanner interface", func(t *testing.T) {
@@ -174,8 +185,8 @@ func TestSQLUsagePatterns(t *testing.T) {
 		orderValue, _ := orderID.Value()
 
 		// These would be stored as UUID columns in PostgreSQL
-		assert.IsType(t, []byte{}, userValue)
-		assert.IsType(t, []byte{}, orderValue)
+		assert.IsType(t, "", userValue)
+		assert.IsType(t, "", orderValue)
 
 		// 3. Load from database
 		var loadedUserID, loadedOrderID xuid.XUID
