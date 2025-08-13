@@ -1,5 +1,9 @@
 # XUID
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Reference](https://pkg.go.dev/badge/github.com/47monad/xuid.svg)](https://pkg.go.dev/github.com/47monad/xuid)
+![Status: Under Development](https://img.shields.io/badge/Status-Under%20Development-orange)
+
 A Go package for generating compact, sortable UUID-based identifiers with optional string prefixes and base58 encoding.
 
 ## Features
