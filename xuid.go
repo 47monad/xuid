@@ -129,6 +129,14 @@ func Parse(idstr string) (XUID, error) {
 	return NewWith(_uuid, prefix)
 }
 
+func MustParse(idstr string) XUID {
+	xid, err := Parse(idstr)
+	if err != nil {
+		panic(err)
+	}
+	return xid
+}
+
 func IsValid(idstr string) bool {
 	_, err := Parse(idstr)
 	return err == nil
