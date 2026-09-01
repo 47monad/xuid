@@ -1,10 +1,9 @@
 module github.com/47monad/xuid
 
-go 1.22.0
+go 1.27.0
 
 require (
 	github.com/btcsuite/btcd/btcutil v1.1.6
-	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.8.4
 )
 

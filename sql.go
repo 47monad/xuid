@@ -3,14 +3,13 @@ package xuid
 import (
 	"database/sql/driver"
 	"errors"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Value implements the driver.Valuer interface.
 // This allows XUID to be stored in SQL databases as UUID.
 func (x XUID) Value() (driver.Value, error) {
-	if x.uuid == uuid.Nil {
+	if x.uuid == uuid.Nil() {
 		return nil, nil
 	}
 	return x.uuid.String(), nil
@@ -22,7 +21,7 @@ func (x XUID) Value() (driver.Value, error) {
 // You should reconstruct XUIDs with their appropriate prefixes after loading.
 func (x *XUID) Scan(value interface{}) error {
 	if value == nil {
-		x.uuid = uuid.Nil
+		x.uuid = uuid.Nil()
 		x.prefix = ""
 		return nil
 	}
@@ -33,7 +32,7 @@ func (x *XUID) Scan(value interface{}) error {
 		if err != nil {
 			return errors.New("failed to scan from database. Invalid XUID string")
 		}
-		copy(x.uuid[:], id[:])
+		x.uuid = id
 		x.prefix = ""
 		return nil
 	case []byte:

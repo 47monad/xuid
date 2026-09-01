@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"testing"
+	"uuid"
 
 	"github.com/47monad/xuid"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -78,7 +78,7 @@ func TestXUIDScan(t *testing.T) {
 		err := id.Scan(nil)
 
 		require.NoError(t, err)
-		assert.Equal(t, uuid.Nil, id.GetUUID())
+		assert.Equal(t, uuid.Nil(), id.GetUUID())
 		assert.Equal(t, "", id.GetPrefix())
 		assert.True(t, xuid.IsEmpty(id))
 	})

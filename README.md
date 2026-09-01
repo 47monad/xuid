@@ -79,11 +79,11 @@ id := xuid.MustNewRandom("order")
 #### From Existing UUID
 
 ```go
-import "github.com/google/uuid"
-
 existingUUID := uuid.New()
 id, err := xuid.NewWith(existingUUID, "custom")
 ```
+
+> Requires Go 1.27+ for the standard library `uuid` package.
 
 #### Nil UUID
 
@@ -204,8 +204,8 @@ var (
 
 ## Dependencies
 
-- `github.com/google/uuid` - UUID generation and manipulation
 - `github.com/btcsuite/btcd/btcutil/base58` - Base58 encoding
+- UUID generation uses the standard library `uuid` package (Go 1.27+)
 
 ## License
 

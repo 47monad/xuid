@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"uuid"
 
 	"github.com/47monad/xuid"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ func TestNewSortable(t *testing.T) {
 		assert.True(t, id.IsSortable())
 		assert.False(t, id.IsRandom())
 		assert.Equal(t, "user", id.GetPrefix())
-		assert.NotEqual(t, uuid.Nil, id.GetUUID())
+		assert.NotEqual(t, uuid.Nil(), id.GetUUID())
 	})
 
 	t.Run("creates sortable XUID without prefix", func(t *testing.T) {
@@ -65,7 +65,7 @@ func TestNewRandom(t *testing.T) {
 		assert.True(t, id.IsRandom())
 		assert.False(t, id.IsSortable())
 		assert.Equal(t, "session", id.GetPrefix())
-		assert.NotEqual(t, uuid.Nil, id.GetUUID())
+		assert.NotEqual(t, uuid.Nil(), id.GetUUID())
 	})
 
 	t.Run("creates random XUID without prefix", func(t *testing.T) {
@@ -114,10 +114,10 @@ func TestNewWith(t *testing.T) {
 	})
 
 	t.Run("creates XUID with nil UUID", func(t *testing.T) {
-		id, err := xuid.NewWith(uuid.Nil, "empty")
+		id, err := xuid.NewWith(uuid.Nil(), "empty")
 
 		require.NoError(t, err)
-		assert.Equal(t, uuid.Nil, id.GetUUID())
+		assert.Equal(t, uuid.Nil(), id.GetUUID())
 		assert.Equal(t, "empty", id.GetPrefix())
 	})
 
@@ -145,7 +145,7 @@ func TestNilUUID(t *testing.T) {
 		id, err := xuid.NilUUID()
 
 		require.NoError(t, err)
-		assert.Equal(t, uuid.Nil, id.GetUUID())
+		assert.Equal(t, uuid.Nil(), id.GetUUID())
 		assert.Equal(t, "", id.GetPrefix())
 		assert.True(t, xuid.IsEmpty(id))
 	})
@@ -379,8 +379,9 @@ func TestVersionChecking(t *testing.T) {
 	})
 
 	t.Run("handles custom UUID versions", func(t *testing.T) {
-		// Using UUID v1 for testing
-		customUUID, _ := uuid.NewUUID()
+		// Using UUID v1 for testing (stdlib uuid has no v1 constructor,
+		// so craft one by setting the version nibble directly)
+		customUUID := uuid.MustParse("550e8400-e29b-11d4-a716-446655440000") // version 1
 		id, _ := xuid.NewWith(customUUID, "test")
 
 		assert.False(t, id.IsSortable())

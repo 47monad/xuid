@@ -23,9 +23,9 @@ package xuid
 import (
 	"errors"
 	"strings"
+	"uuid"
 
 	"github.com/btcsuite/btcd/btcutil/base58"
-	"github.com/google/uuid"
 )
 
 type XUID struct {
@@ -46,12 +46,8 @@ func NewWith(id uuid.UUID, prefix string) (XUID, error) {
 }
 
 func NewSortable(prefix string) (XUID, error) {
-	id, err := uuid.NewV7()
-	if err != nil {
-		return XUID{}, err
-	}
 	return XUID{
-		uuid:   id,
+		uuid:   uuid.NewV7(),
 		prefix: prefix,
 	}, nil
 }
@@ -61,12 +57,8 @@ func MustNewSortable(prefix string) XUID {
 }
 
 func NewRandom(prefix string) (XUID, error) {
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return XUID{}, err
-	}
 	return XUID{
-		uuid:   id,
+		uuid:   uuid.NewV4(),
 		prefix: prefix,
 	}, nil
 }
@@ -76,7 +68,7 @@ func MustNewRandom(prefix string) XUID {
 }
 
 func NilUUID() (XUID, error) {
-	return NewWith(uuid.Nil, "")
+	return NewWith(uuid.Nil(), "")
 }
 
 func (x XUID) GetUUID() uuid.UUID {
@@ -84,11 +76,11 @@ func (x XUID) GetUUID() uuid.UUID {
 }
 
 func (x XUID) IsSortable() bool {
-	return x.GetUUID().Version().String() == "VERSION_7"
+	return x.uuid[6]>>4 == 7
 }
 
 func (x XUID) IsRandom() bool {
-	return x.GetUUID().Version().String() == "VERSION_4"
+	return x.uuid[6]>>4 == 4
 }
 
 func (x XUID) GetPrefix() string {
@@ -103,11 +95,10 @@ func (x *XUID) SetPrefix(prefix string) *XUID {
 }
 
 func (x XUID) String() string {
-	b, _ := x.uuid.MarshalBinary()
 	if x.prefix == "" {
-		return base58.Encode(b)
+		return base58.Encode(x.uuid[:])
 	}
-	return x.prefix + "_" + base58.Encode(b)
+	return x.prefix + "_" + base58.Encode(x.uuid[:])
 }
 
 func (x XUID) Equal(y XUID) bool {
@@ -122,10 +113,11 @@ func Parse(idstr string) (XUID, error) {
 		prefix = idstr[:underscoreIndex]
 	}
 	_str := base58.Decode(uuidstr)
-	_uuid, err := uuid.FromBytes(_str)
-	if err != nil {
+	var _uuid uuid.UUID
+	if len(_str) != len(_uuid) {
 		return XUID{}, ErrParse
 	}
+	copy(_uuid[:], _str)
 	return NewWith(_uuid, prefix)
 }
 
@@ -150,5 +142,5 @@ func Must(xid XUID, err error) XUID {
 }
 
 func IsEmpty(xid XUID) bool {
-	return xid.uuid == uuid.Nil
+	return xid.uuid == uuid.Nil()
 }
