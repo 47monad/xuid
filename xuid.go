@@ -24,8 +24,6 @@ import (
 	"errors"
 	"strings"
 	"uuid"
-
-	"github.com/btcsuite/btcd/btcutil/base58"
 )
 
 type XUID struct {
@@ -96,9 +94,9 @@ func (x *XUID) SetPrefix(prefix string) *XUID {
 
 func (x XUID) String() string {
 	if x.prefix == "" {
-		return base58.Encode(x.uuid[:])
+		return encodeBase58(x.uuid[:])
 	}
-	return x.prefix + "_" + base58.Encode(x.uuid[:])
+	return x.prefix + "_" + encodeBase58(x.uuid[:])
 }
 
 func (x XUID) Equal(y XUID) bool {
@@ -112,7 +110,16 @@ func Parse(idstr string) (XUID, error) {
 	if underscoreIndex >= 0 {
 		prefix = idstr[:underscoreIndex]
 	}
-	_str := base58.Decode(uuidstr)
+	// A 16-byte UUID never encodes to more than maxEncodedLen base58
+	// digits, so anything longer (or empty) is invalid before decoding.
+	// This also bounds decode work on adversarially long input.
+	if len(uuidstr) == 0 || len(uuidstr) > maxEncodedLen {
+		return XUID{}, ErrParse
+	}
+	_str, err := decodeBase58(uuidstr)
+	if err != nil {
+		return XUID{}, ErrParse
+	}
 	var _uuid uuid.UUID
 	if len(_str) != len(_uuid) {
 		return XUID{}, ErrParse

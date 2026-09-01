@@ -204,8 +204,8 @@ var (
 
 ## Dependencies
 
-- `github.com/btcsuite/btcd/btcutil/base58` - Base58 encoding
 - UUID generation uses the standard library `uuid` package (Go 1.27+)
+- Base58 encoding is implemented internally using the Bitcoin alphabet, which excludes the visually ambiguous characters `0`, `O`, `I`, and `l` for readability — there is no external base58 dependency
 
 ## License
 
