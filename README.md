@@ -142,9 +142,27 @@ if xuid.IsEmpty(id) {
 id1 := xuid.MustNewSortable("user")
 id2 := xuid.MustNewSortable("user")
 
+// Equal compares both the UUID and the prefix: a different prefix
+// means the identifiers are not equal, even with the same UUID.
 if id1.Equal(id2) {
     fmt.Println("XUIDs are equal")
 }
+
+// EqualUUID compares only the underlying UUIDs, ignoring prefixes.
+if id1.EqualUUID(id2) {
+    fmt.Println("Same identifier, prefix ignored")
+}
+
+// Compare orders XUIDs by prefix first (empty prefix sorts first),
+// then by UUID bytes. For UUIDv7 IDs sharing a prefix, this is
+// chronological order.
+if xuid.Compare(id1, id2) < 0 {
+    fmt.Println("id1 sorts before id2")
+}
+
+// Sort a slice of XUIDs.
+ids := []xuid.XUID{id2, id1}
+slices.SortFunc(ids, xuid.Compare)
 ```
 
 ### JSON Support
