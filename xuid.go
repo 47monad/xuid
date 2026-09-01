@@ -99,8 +99,48 @@ func (x XUID) String() string {
 	return x.prefix + "_" + encodeBase58(x.uuid[:])
 }
 
+// Equal reports whether x and y identify the same XUID.
+//
+// Two XUIDs are equal only if both their UUID and prefix match.
+// A different prefix means the identifiers are not equal, even when
+// they carry the same UUID, because the prefix is part of the
+// identifier's identity. To compare only the underlying UUIDs,
+// use EqualUUID.
 func (x XUID) Equal(y XUID) bool {
-	return x.String() == y.String()
+	return x.uuid == y.uuid && x.prefix == y.prefix
+}
+
+// EqualUUID reports whether x and y carry the same UUID, ignoring
+// their prefixes. It is useful when the same identifier is stored
+// under different prefixes (e.g. after restoring a prefix from a
+// database column).
+func (x XUID) EqualUUID(y XUID) bool {
+	return x.uuid == y.uuid
+}
+
+// Compare returns an integer comparing two XUIDs.
+//
+// The result is -1 if x sorts before y, 0 if x and y are ordered
+// identically, and +1 if x sorts after y.
+//
+// XUIDs are ordered by prefix first (an empty prefix sorts before
+// any non-empty prefix), then by UUID bytes. For UUIDv7 identifiers
+// sharing a prefix, the UUID bytes preserve chronological order, so
+// Compare yields time-ordered results within each prefix.
+//
+// Note that Compare treats XUIDs as ordered values, not identical
+// ones: Compare returns 0 only when both prefix and UUID match.
+func Compare(x, y XUID) int {
+	if c := strings.Compare(x.prefix, y.prefix); c != 0 {
+		return c
+	}
+	return x.uuid.Compare(y.uuid)
+}
+
+// Less reports whether x sorts before y. It is equivalent to
+// Compare(x, y) < 0.
+func Less(x, y XUID) bool {
+	return Compare(x, y) < 0
 }
 
 func Parse(idstr string) (XUID, error) {

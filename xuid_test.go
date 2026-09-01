@@ -2,8 +2,10 @@ package xuid_test
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 	"uuid"
 
 	"github.com/47monad/xuid"
@@ -200,6 +202,118 @@ func TestXUIDEqual(t *testing.T) {
 		id2, _ := xuid.NewWith(testUUID, "test2")
 
 		assert.False(t, id1.Equal(id2))
+	})
+
+	t.Run("does not depend on string encoding", func(t *testing.T) {
+		testUUID := uuid.New()
+		id1, _ := xuid.NewWith(testUUID, "")
+		id2, _ := xuid.NewWith(testUUID, "")
+		require.Equal(t, id1.String(), id2.String())
+		assert.True(t, id1.Equal(id2))
+	})
+}
+
+func TestXUIDEqualUUID(t *testing.T) {
+	t.Run("returns true for same UUID with different prefixes", func(t *testing.T) {
+		testUUID := uuid.New()
+		id1, _ := xuid.NewWith(testUUID, "user")
+		id2, _ := xuid.NewWith(testUUID, "order")
+
+		assert.True(t, id1.EqualUUID(id2))
+		assert.False(t, id1.Equal(id2))
+	})
+
+	t.Run("returns true for same UUID ignoring empty prefix", func(t *testing.T) {
+		testUUID := uuid.New()
+		id1, _ := xuid.NewWith(testUUID, "")
+		id2, _ := xuid.NewWith(testUUID, "user")
+
+		assert.True(t, id1.EqualUUID(id2))
+	})
+
+	t.Run("returns false for different UUIDs", func(t *testing.T) {
+		id1, _ := xuid.NewWith(uuid.New(), "test")
+		id2, _ := xuid.NewWith(uuid.New(), "test")
+
+		assert.False(t, id1.EqualUUID(id2))
+	})
+}
+
+func TestCompare(t *testing.T) {
+	t.Run("returns 0 for equal XUIDs", func(t *testing.T) {
+		testUUID := uuid.New()
+		id1, _ := xuid.NewWith(testUUID, "test")
+		id2, _ := xuid.NewWith(testUUID, "test")
+
+		assert.Equal(t, 0, xuid.Compare(id1, id2))
+	})
+
+	t.Run("returns 0 only when prefix and UUID match", func(t *testing.T) {
+		testUUID := uuid.New()
+		id1, _ := xuid.NewWith(testUUID, "user")
+		id2, _ := xuid.NewWith(testUUID, "order")
+
+		assert.NotEqual(t, 0, xuid.Compare(id1, id2))
+	})
+
+	t.Run("sorts by prefix before UUID", func(t *testing.T) {
+		id1, _ := xuid.NewWith(uuid.MustParse("00000000-0000-7000-8000-000000000001"), "a")
+		id2, _ := xuid.NewWith(uuid.MustParse("00000000-0000-7000-8000-000000000000"), "b")
+
+		assert.Equal(t, -1, xuid.Compare(id1, id2))
+		assert.Equal(t, 1, xuid.Compare(id2, id1))
+	})
+
+	t.Run("sorts empty prefix before non-empty prefix", func(t *testing.T) {
+		id1, _ := xuid.NewWith(uuid.New(), "")
+		id2, _ := xuid.NewWith(uuid.New(), "user")
+
+		assert.Equal(t, -1, xuid.Compare(id1, id2))
+		assert.Equal(t, 1, xuid.Compare(id2, id1))
+	})
+
+	t.Run("sorts by UUID bytes for equal prefixes", func(t *testing.T) {
+		id1, _ := xuid.NewWith(uuid.MustParse("00000000-0000-7000-8000-000000000001"), "test")
+		id2, _ := xuid.NewWith(uuid.MustParse("00000000-0000-7000-8000-000000000002"), "test")
+
+		assert.Equal(t, -1, xuid.Compare(id1, id2))
+		assert.Equal(t, 1, xuid.Compare(id2, id1))
+		assert.Equal(t, 0, xuid.Compare(id1, id1))
+	})
+
+	t.Run("preserves chronological order for UUIDv7 with same prefix", func(t *testing.T) {
+		id1 := xuid.MustNewSortable("user")
+		time.Sleep(2 * time.Millisecond)
+		id2 := xuid.MustNewSortable("user")
+
+		assert.Equal(t, -1, xuid.Compare(id1, id2))
+		assert.Equal(t, 1, xuid.Compare(id2, id1))
+	})
+
+	t.Run("sorts a slice of XUIDs", func(t *testing.T) {
+		ids := []xuid.XUID{
+			xuid.Must(xuid.NewWith(uuid.MustParse("00000000-0000-7000-8000-000000000002"), "user")),
+			xuid.Must(xuid.NewWith(uuid.MustParse("00000000-0000-7000-8000-000000000001"), "user")),
+			xuid.Must(xuid.NewWith(uuid.MustParse("00000000-0000-7000-8000-000000000001"), "order")),
+			xuid.Must(xuid.NewWith(uuid.MustParse("00000000-0000-7000-8000-000000000000"), "")),
+		}
+		slices.SortFunc(ids, xuid.Compare)
+
+		assert.Equal(t, "", ids[0].GetPrefix())
+		assert.Equal(t, "order", ids[1].GetPrefix())
+		assert.Equal(t, "00000000-0000-7000-8000-000000000001", ids[2].GetUUID().String())
+		assert.Equal(t, "00000000-0000-7000-8000-000000000002", ids[3].GetUUID().String())
+	})
+}
+
+func TestLess(t *testing.T) {
+	t.Run("matches Compare", func(t *testing.T) {
+		id1, _ := xuid.NewWith(uuid.MustParse("00000000-0000-7000-8000-000000000001"), "test")
+		id2, _ := xuid.NewWith(uuid.MustParse("00000000-0000-7000-8000-000000000002"), "test")
+
+		assert.True(t, xuid.Less(id1, id2))
+		assert.False(t, xuid.Less(id2, id1))
+		assert.False(t, xuid.Less(id1, id1))
 	})
 }
 
