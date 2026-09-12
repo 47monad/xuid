@@ -524,21 +524,50 @@ func TestGetters(t *testing.T) {
 	})
 }
 
-func TestSetters(t *testing.T) {
-	t.Run("SetPrefix sets prefix to XUID without prefix", func(t *testing.T) {
+func TestWithPrefix(t *testing.T) {
+	t.Run("WithPrefix sets prefix to XUID without prefix", func(t *testing.T) {
 		testXUID, _ := xuid.NewSortable("")
 
-		testXUID.SetPrefix("user")
+		withPrefix := testXUID.WithPrefix("user")
 
-		assert.Equal(t, "user", testXUID.GetPrefix())
+		assert.Equal(t, "user", withPrefix.GetPrefix())
+		assert.Equal(t, testXUID.GetUUID(), withPrefix.GetUUID())
 	})
 
-	t.Run("SetPrefix replaces existing prefix", func(t *testing.T) {
+	t.Run("WithPrefix replaces existing prefix", func(t *testing.T) {
 		testXUID, _ := xuid.NewSortable("old")
 
-		testXUID.SetPrefix("new")
+		withNewPrefix := testXUID.WithPrefix("new")
 
-		assert.Equal(t, "new", testXUID.GetPrefix()) // Original unchanged
+		assert.Equal(t, "new", withNewPrefix.GetPrefix())
+	})
+
+	t.Run("WithPrefix clears prefix when empty", func(t *testing.T) {
+		testXUID, _ := xuid.NewSortable("old")
+
+		withoutPrefix := testXUID.WithPrefix("")
+
+		assert.Equal(t, "", withoutPrefix.GetPrefix())
+		assert.Equal(t, testXUID.GetUUID(), withoutPrefix.GetUUID())
+	})
+
+	t.Run("WithPrefix leaves original unchanged", func(t *testing.T) {
+		testXUID, _ := xuid.NewSortable("old")
+
+		_ = testXUID.WithPrefix("new")
+
+		assert.Equal(t, "old", testXUID.GetPrefix())
+	})
+
+	t.Run("WithPrefix chains off non-addressable values", func(t *testing.T) {
+		original := xuid.MustNewSortable("user")
+
+		// MustParse returns a value (not a pointer), so the result is
+		// non-addressable and chaining must work without storing it
+		// in a variable first.
+		restored := xuid.MustParse(original.String()).WithPrefix("user")
+
+		assert.True(t, original.Equal(restored))
 	})
 }
 
@@ -629,12 +658,12 @@ func BenchmarkJSONUnmarshal(b *testing.B) {
 	}
 }
 
-func BenchmarkSetPrefix(b *testing.B) {
+func BenchmarkWithPrefix(b *testing.B) {
 	id := xuid.MustNewSortable("bench")
 
-	b.Run("SetPrefixPrefix", func(b *testing.B) {
+	b.Run("WithPrefix", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = id.SetPrefix("bench")
+			_ = id.WithPrefix("bench")
 		}
 	})
 }

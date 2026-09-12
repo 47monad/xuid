@@ -194,7 +194,18 @@ json.Unmarshal(data, &parsed)
 XUIDs integrate seamlessly with SQL databases such as PostgreSQL and MySQL. However, there are a few caveats to keep in mind:
 
 - **Only the UUID bytes are stored** — The 16-byte UUID is stored in the database as a []byte (e.g., BYTEA in PostgreSQL or BINARY(16) in MySQL). This ensures efficient storage and indexing.
-- **Prefixes are not stored** — If your application relies on the XUID prefix (e.g., "file_", "user_") for querying or categorization, you’ll need to store the prefix in a separate column.
+- **Prefixes are not stored** — Scanning a database value yields a XUID with an empty prefix. Restore the prefix with `WithPrefix` in your repository/DAO layer, based on the table or column the value was read from:
+
+```go
+// Load from database
+var loaded xuid.XUID
+loaded.Scan(value)
+
+// Restore prefix (the repo layer knows this column is a user ID)
+restored := loaded.WithPrefix("user")
+```
+
+`WithPrefix` is immutable: it returns a copy and chains off any value, including non-addressable ones such as `xuid.MustParse(s).WithPrefix("user")`. The older `SetPrefix` method is deprecated.
 
 ## Format
 

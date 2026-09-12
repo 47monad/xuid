@@ -85,8 +85,25 @@ func (x XUID) GetPrefix() string {
 	return x.prefix
 }
 
+// WithPrefix returns a copy of x with the prefix set to prefix.
+// It is the supported way to restore a prefix after loading the
+// underlying UUID from a database column, since Scan discards prefixes:
+//
+//	restored := xuid.MustParse(s).WithPrefix("user")
+//
+// Being immutable, it chains off any value, including non-addressable
+// ones such as function results.
+func (x XUID) WithPrefix(prefix string) XUID {
+	x.prefix = prefix
+	return x
+}
+
 // SetPrefix sets the prefix field to the specified prefix.
 // This is useful when loading XUIDs from database and need to restore the prefix.
+//
+// Deprecated: use WithPrefix instead. SetPrefix mixes mutation with
+// chaining semantics and cannot be chained off non-addressable values,
+// such as function results.
 func (x *XUID) SetPrefix(prefix string) *XUID {
 	x.prefix = prefix
 	return x
