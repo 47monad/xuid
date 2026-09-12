@@ -18,7 +18,12 @@ func (x XUID) Value() (driver.Value, error) {
 // Scan implements the sql.Scanner interface.
 // This allows XUID to be loaded from SQL databases.
 // Note: The prefix information is lost when loading from database.
-// You should reconstruct XUIDs with their appropriate prefixes after loading.
+// Restore prefixes with WithPrefix after loading, based on the table
+// or column the value was read from:
+//
+//	var loaded xuid.XUID
+//	loaded.Scan(value)
+//	restored := loaded.WithPrefix("user")
 func (x *XUID) Scan(value interface{}) error {
 	if value == nil {
 		x.uuid = uuid.Nil()
