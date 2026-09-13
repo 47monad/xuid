@@ -31,6 +31,26 @@ jobs:
       - name: Test
         run: go test -race ./...
 
+  # Runs each fuzz target for a short, fixed window. The test job above only
+  # executes the seed corpus, so without this step the fuzzers would never
+  # explore new inputs in CI. A dedicated job keeps the fuzzing off the Go
+  # version matrix while still failing the build on a crash.
+  fuzz:
+    name: fuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [FuzzParseNoPanic, FuzzParseRoundTrip, FuzzBase58]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Fuzz ${{ matrix.target }} (smoke)
+        run: go test -run '^$' -fuzz '${{ matrix.target }}' -fuzztime 30s .
+
   lint:
     name: lint
     runs-on: ubuntu-latest
