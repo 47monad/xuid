@@ -133,15 +133,6 @@ func TestNewWith(t *testing.T) {
 	})
 }
 
-func TestNew(t *testing.T) {
-	t.Run("returns error for unsupported method", func(t *testing.T) {
-		_, err := xuid.New()
-
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "method not supported")
-	})
-}
-
 func TestNilUUID(t *testing.T) {
 	t.Run("creates XUID with nil UUID", func(t *testing.T) {
 		id, err := xuid.NilUUID()

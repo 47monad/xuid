@@ -83,13 +83,28 @@ func TestXUIDScan(t *testing.T) {
 		assert.True(t, xuid.IsEmpty(id))
 	})
 
-	t.Run("returns error for invalid XUID format", func(t *testing.T) {
+	t.Run("returns ErrScan for invalid XUID format", func(t *testing.T) {
 		var id xuid.XUID
 
 		err := id.Scan("invalid-xuid-format")
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Invalid XUID string")
+		assert.ErrorIs(t, err, xuid.ErrScan)
+	})
+
+	t.Run("returns ErrScan for invalid UUID byte length", func(t *testing.T) {
+		var id xuid.XUID
+
+		err := id.Scan([]byte{0x01, 0x02, 0x03})
+
+		assert.ErrorIs(t, err, xuid.ErrScan)
+	})
+
+	t.Run("returns ErrScan for unsupported type", func(t *testing.T) {
+		var id xuid.XUID
+
+		err := id.Scan(123)
+
+		assert.ErrorIs(t, err, xuid.ErrScan)
 	})
 
 	t.Run("implements sql.Scanner interface", func(t *testing.T) {

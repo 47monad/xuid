@@ -21,7 +21,6 @@
 package xuid
 
 import (
-	"errors"
 	"strings"
 	"uuid"
 )
@@ -29,11 +28,6 @@ import (
 type XUID struct {
 	uuid   uuid.UUID
 	prefix string
-}
-
-func New() (XUID, error) {
-	var xid XUID
-	return xid, errors.New("method not supported")
 }
 
 func NewWith(id uuid.UUID, prefix string) (XUID, error) {

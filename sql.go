@@ -2,7 +2,7 @@ package xuid
 
 import (
 	"database/sql/driver"
-	"errors"
+	"fmt"
 	"uuid"
 )
 
@@ -35,19 +35,19 @@ func (x *XUID) Scan(value interface{}) error {
 	case string:
 		id, err := uuid.Parse(d)
 		if err != nil {
-			return errors.New("failed to scan from database. Invalid XUID string")
+			return fmt.Errorf("%w: invalid UUID string %q", ErrScan, d)
 		}
 		x.uuid = id
 		x.prefix = ""
 		return nil
 	case []byte:
 		if len(d) != 16 {
-			return errors.New("failed to scan from database. Invalid XUID bytes")
+			return fmt.Errorf("%w: invalid UUID byte length %d, want 16", ErrScan, len(d))
 		}
 		copy(x.uuid[:], d)
 		x.prefix = "" // Prefix is lost when loading from database
 		return nil
 	}
 
-	return errors.New("unsupported type to scan as sql value")
+	return fmt.Errorf("%w: unsupported type %T", ErrScan, value)
 }
