@@ -222,13 +222,24 @@ The identifier part is a base58-encoded UUID, making it:
 
 ## Error Handling
 
-The package defines specific error types:
+The package defines sentinel errors:
 
 ```go
 var (
-    ErrInvalidUUIDString = errors.New("UUID string is invalid")
-    ErrParse             = errors.New("XUID string cannot be parsed")
+    ErrParse = errors.New("XUID string cannot be parsed")
+    ErrScan  = errors.New("XUID cannot be scanned from a SQL value")
 )
+```
+
+`Parse` returns `ErrParse` for malformed XUID strings.
+`Scan` wraps `ErrScan` with context, so scan failures can be detected with
+`errors.Is`:
+
+```go
+var id xuid.XUID
+if err := id.Scan(value); errors.Is(err, xuid.ErrScan) {
+    // the database value was not a valid UUID
+}
 ```
 
 ## Dependencies

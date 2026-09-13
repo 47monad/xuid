@@ -3,6 +3,11 @@ package xuid
 import "errors"
 
 var (
-	ErrInvalidUUIDString = errors.New("UUID string is invalid")
-	ErrParse             = errors.New("XUID string cannot be parsed")
+	// ErrParse is returned by Parse when a string is not a valid XUID.
+	ErrParse = errors.New("XUID string cannot be parsed")
+
+	// ErrScan is returned by XUID.Scan when a database value cannot be
+	// converted to an XUID. Scan wraps it with context, so failures can be
+	// detected with errors.Is(err, ErrScan).
+	ErrScan = errors.New("XUID cannot be scanned from a SQL value")
 )
