@@ -354,8 +354,8 @@ func TestSQLUsagePatterns(t *testing.T) {
 
 		// 3. Load from database
 		var loadedUserID, loadedOrderID xuid.XUID
-		loadedUserID.Scan(userValue)
-		loadedOrderID.Scan(orderValue)
+		require.NoError(t, loadedUserID.Scan(userValue))
+		require.NoError(t, loadedOrderID.Scan(orderValue))
 
 		// 4. Restore prefixes based on context (table/column knowledge)
 		restoredUserID := loadedUserID.MustWithPrefix("user")
@@ -372,7 +372,7 @@ func TestSQLUsagePatterns(t *testing.T) {
 		value, _ := userID.Value()
 
 		var loaded xuid.XUID
-		loaded.Scan(value)
+		require.NoError(t, loaded.Scan(value))
 
 		// In your repository/DAO layer:
 		restoredFromUsersTable := loaded.MustWithPrefix("user")
