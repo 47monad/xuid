@@ -231,9 +231,17 @@ var (
 )
 ```
 
-`Parse` returns `ErrParse` for malformed XUID strings.
-`Scan` wraps `ErrScan` with context, so scan failures can be detected with
-`errors.Is`:
+`Parse` wraps `ErrParse` with the underlying cause for malformed XUID
+strings, so failures can be detected with `errors.Is` while still carrying
+a message that explains what went wrong:
+
+```go
+if _, err := xuid.Parse(s); errors.Is(err, xuid.ErrParse) {
+    // s was not a valid XUID
+}
+```
+
+`Scan` likewise wraps `ErrScan` with context:
 
 ```go
 var id xuid.XUID

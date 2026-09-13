@@ -49,14 +49,6 @@ func TestMustNewSortable(t *testing.T) {
 		assert.True(t, id.IsSortable())
 		assert.Equal(t, "order", id.GetPrefix())
 	})
-
-	t.Run("panics on error", func(t *testing.T) {
-		// Note: MustNewSortable should not panic in normal circumstances
-		// This test ensures the Must function works correctly
-		assert.NotPanics(t, func() {
-			xuid.MustNewSortable("test")
-		})
-	})
 }
 
 func TestNewRandom(t *testing.T) {
@@ -94,14 +86,6 @@ func TestMustNewRandom(t *testing.T) {
 
 		assert.True(t, id.IsRandom())
 		assert.Equal(t, "order", id.GetPrefix())
-	})
-
-	t.Run("panics on error", func(t *testing.T) {
-		// Note: MustNewRandom should not panic in normal circumstances
-		// This test ensures the Must function works correctly
-		assert.NotPanics(t, func() {
-			xuid.MustNewRandom("test")
-		})
 	})
 }
 
@@ -348,14 +332,33 @@ func TestParse(t *testing.T) {
 		_, err := xuid.Parse("invalid_string")
 
 		assert.Error(t, err)
-		assert.Equal(t, xuid.ErrParse, err)
+		assert.ErrorIs(t, err, xuid.ErrParse)
+		// The wrapped cause explains why parsing failed.
+		assert.ErrorContains(t, err, "want 16")
 	})
 
 	t.Run("returns error for malformed base58", func(t *testing.T) {
 		_, err := xuid.Parse("test_invalid0characters")
 
 		assert.Error(t, err)
-		assert.Equal(t, xuid.ErrParse, err)
+		assert.ErrorIs(t, err, xuid.ErrParse)
+		// The wrapped cause identifies the invalid character.
+		assert.ErrorContains(t, err, "invalid character")
+	})
+
+	t.Run("returns error for empty identifier", func(t *testing.T) {
+		_, err := xuid.Parse("")
+		assert.ErrorIs(t, err, xuid.ErrParse)
+
+		_, err = xuid.Parse("user_")
+		assert.ErrorIs(t, err, xuid.ErrParse)
+	})
+
+	t.Run("returns error for overlong identifier", func(t *testing.T) {
+		_, err := xuid.Parse("user_" + strings.Repeat("2", 23))
+
+		assert.ErrorIs(t, err, xuid.ErrParse)
+		assert.ErrorContains(t, err, "exceeds 22")
 	})
 }
 
@@ -656,5 +659,32 @@ func BenchmarkWithPrefix(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = id.WithPrefix("bench")
 		}
+	})
+}
+
+// FuzzParseRoundTrip asserts that every XUID survives a String/Parse
+// round trip: Parse(x.String()) must equal x. It fuzzes both the prefix
+// (including underscores and non-ASCII runes) and the raw UUID bytes, so
+// malformed prefixes or encodings cannot silently corrupt an identifier.
+func FuzzParseRoundTrip(f *testing.F) {
+	f.Add("user", []byte{
+		0x01, 0x8f, 0x2a, 0x3b, 0x4c, 0x5d, 0x6e, 0x7f,
+		0x80, 0x91, 0xa2, 0xb3, 0xc4, 0xd5, 0xe6, 0xf7,
+	})
+	f.Add("", []byte{})
+	f.Add("user_profile", []byte{0xff})
+	f.Add("_", []byte{0x00})
+
+	f.Fuzz(func(t *testing.T, prefix string, raw []byte) {
+		var u uuid.UUID
+		copy(u[:], raw)
+
+		original, err := xuid.NewWith(u, prefix)
+		require.NoError(t, err)
+
+		parsed, err := xuid.Parse(original.String())
+		require.NoError(t, err)
+		assert.True(t, original.Equal(parsed),
+			"round trip mismatch: %q != %q", original.String(), parsed.String())
 	})
 }

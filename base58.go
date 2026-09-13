@@ -21,8 +21,8 @@ const (
 	invalid = 0xFF
 )
 
-// Internal sentinel errors. They are deliberately unexported: Parse maps
-// every decode failure to the public ErrParse.
+// Internal sentinel errors. They are deliberately unexported: Parse wraps
+// every decode failure into the public ErrParse.
 var (
 	errBase58TooLong          = errors.New("base58 string exceeds maximum length")
 	errBase58InvalidCharacter = errors.New("base58 string contains invalid character")

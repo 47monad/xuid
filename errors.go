@@ -4,6 +4,8 @@ import "errors"
 
 var (
 	// ErrParse is returned by Parse when a string is not a valid XUID.
+	// Parse wraps it with the underlying cause, so failures can be
+	// detected with errors.Is(err, ErrParse).
 	ErrParse = errors.New("XUID string cannot be parsed")
 
 	// ErrScan is returned by XUID.Scan when a database value cannot be
