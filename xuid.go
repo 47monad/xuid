@@ -7,7 +7,8 @@
 // - Built-in JSON marshaling/unmarshaling and text encoding support
 //
 // Prefixes are validated: they must be at most MaxPrefixLen bytes and
-// contain only [a-zA-Z0-9_]. See ValidatePrefix.
+// contain only [a-zA-Z0-9_]. See ValidatePrefix. The nil UUID represents
+// an absent identifier and never carries a prefix; see NewWith.
 //
 // Example usage:
 //
@@ -62,9 +63,19 @@ func ValidatePrefix(prefix string) error {
 	return nil
 }
 
+// NewWith returns an XUID carrying id and prefix.
+//
+// The prefix must satisfy ValidatePrefix. A non-empty prefix is rejected
+// when id is the nil UUID (wrapping ErrNilUUIDWithPrefix): the nil UUID
+// represents an absent identifier and is always encoded as null/empty by
+// JSON, text and SQL, so a prefixed nil UUID could not round-trip. Use
+// an empty prefix for a nil UUID, as NilUUID does.
 func NewWith(id uuid.UUID, prefix string) (XUID, error) {
 	if err := ValidatePrefix(prefix); err != nil {
 		return XUID{}, err
+	}
+	if id == uuid.Nil() && prefix != "" {
+		return XUID{}, fmt.Errorf("%w: prefix %q", ErrNilUUIDWithPrefix, prefix)
 	}
 	return XUID{
 		uuid:   id,
@@ -100,6 +111,8 @@ func MustNewRandom(prefix string) XUID {
 	return Must(NewRandom(prefix))
 }
 
+// NilUUID returns the empty XUID: a nil UUID with no prefix. It is the
+// same value as the zero-value XUID and satisfies IsEmpty.
 func NilUUID() (XUID, error) {
 	return NewWith(uuid.Nil(), "")
 }
@@ -151,8 +164,11 @@ func (x XUID) GetPrefix() string {
 //	restored, err := xuid.MustParse(s).WithPrefix("user")
 //
 // The prefix is validated like it is in the constructors; an invalid
-// prefix returns an error wrapping ErrInvalidPrefix. Use MustWithPrefix
-// for a chainable, panic-on-error form:
+// prefix returns an error wrapping ErrInvalidPrefix. A non-empty prefix
+// on the nil UUID is rejected with an error wrapping
+// ErrNilUUIDWithPrefix, since a nil UUID is an absent identifier that
+// cannot carry a prefix. Use MustWithPrefix for a chainable,
+// panic-on-error form:
 //
 //	restored := xuid.MustParse(s).MustWithPrefix("user")
 //
@@ -161,6 +177,9 @@ func (x XUID) GetPrefix() string {
 func (x XUID) WithPrefix(prefix string) (XUID, error) {
 	if err := ValidatePrefix(prefix); err != nil {
 		return XUID{}, err
+	}
+	if x.uuid == uuid.Nil() && prefix != "" {
+		return XUID{}, fmt.Errorf("%w: prefix %q", ErrNilUUIDWithPrefix, prefix)
 	}
 	x.prefix = prefix
 	return x, nil
@@ -178,7 +197,9 @@ func (x XUID) MustWithPrefix(prefix string) XUID {
 //
 // The prefix is not validated; an invalid prefix produces an XUID whose
 // String cannot be parsed back by Parse. Prefer WithPrefix, which
-// validates the prefix and reports an error.
+// validates the prefix and reports an error. Unlike WithPrefix, this
+// method also does not enforce the nil-UUID/prefix invariant, so it can
+// produce a value that JSON, text and SQL cannot round-trip.
 //
 // Deprecated: use WithPrefix instead. SetPrefix mixes mutation with
 // chaining semantics and cannot be chained off non-addressable values,
@@ -246,13 +267,16 @@ func Less(x, y XUID) bool {
 //	user_admin_8M7Qq2vR3kGbF9wN5pL2xA -> prefix "user_admin"
 //
 // The prefix must satisfy ValidatePrefix (at most MaxPrefixLen bytes of
-// [a-zA-Z0-9_]); otherwise the string is rejected. Because Parse
+// [a-zA-Z0-9_]); otherwise the string is rejected. A string whose
+// decoded UUID is the nil UUID but whose prefix is non-empty is also
+// rejected, because the nil UUID never carries a prefix. Because Parse
 // enforces the same rules, IsValid does too.
 //
 // Every failure wraps ErrParse with the underlying cause, so callers
 // can detect them with errors.Is(err, ErrParse) while still logging a
 // message that explains why parsing failed. Prefix failures also wrap
-// ErrInvalidPrefix, so errors.Is(err, ErrInvalidPrefix) works as well.
+// ErrInvalidPrefix, and a prefixed nil UUID wraps
+// ErrNilUUIDWithPrefix, so errors.Is works for those too.
 func Parse(idstr string) (XUID, error) {
 	prefix := ""
 	uuidstr := idstr
@@ -284,7 +308,11 @@ func Parse(idstr string) (XUID, error) {
 		return XUID{}, fmt.Errorf("%w: decoded %d bytes, want %d", ErrParse, len(decoded), len(id))
 	}
 	copy(id[:], decoded)
-	return NewWith(id, prefix)
+	xid, err := NewWith(id, prefix)
+	if err != nil {
+		return XUID{}, fmt.Errorf("%w: %w", ErrParse, err)
+	}
+	return xid, nil
 }
 
 func MustParse(idstr string) XUID {
@@ -307,6 +335,9 @@ func Must(xid XUID, err error) XUID {
 	return xid
 }
 
+// IsEmpty reports whether xid is the empty XUID: one whose UUID is the
+// nil UUID. The empty XUID never carries a prefix (see NewWith), so an
+// empty XUID always has an empty prefix.
 func IsEmpty(xid XUID) bool {
 	return xid.uuid == uuid.Nil()
 }

@@ -105,6 +105,16 @@ func TestXUIDUnmarshalJSON(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("rejects a prefixed nil UUID string", func(t *testing.T) {
+		var id xuid.XUID
+
+		err := json.Unmarshal([]byte(`"user_1111111111111111"`), &id)
+
+		assert.ErrorIs(t, err, xuid.ErrParse)
+		assert.ErrorIs(t, err, xuid.ErrNilUUIDWithPrefix)
+		assert.True(t, xuid.IsEmpty(id))
+	})
+
 	t.Run("returns error for non-string JSON value", func(t *testing.T) {
 		var id xuid.XUID
 
