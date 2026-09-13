@@ -21,6 +21,7 @@
 package xuid
 
 import (
+	"fmt"
 	"strings"
 	"uuid"
 )
@@ -154,29 +155,43 @@ func Less(x, y XUID) bool {
 	return Compare(x, y) < 0
 }
 
+// Parse decodes an XUID string. The final underscore separates the
+// optional prefix from the base58-encoded UUID, so any underscores
+// inside the prefix are preserved:
+//
+//	user_admin_8M7Qq2vR3kGbF9wN5pL2xA -> prefix "user_admin"
+//
+// Every failure wraps ErrParse with the underlying cause, so callers
+// can detect them with errors.Is(err, ErrParse) while still logging a
+// message that explains why parsing failed.
 func Parse(idstr string) (XUID, error) {
-	underscoreIndex := strings.LastIndex(idstr, "_")
-	uuidstr := idstr[underscoreIndex+1:]
 	prefix := ""
-	if underscoreIndex >= 0 {
-		prefix = idstr[:underscoreIndex]
+	uuidstr := idstr
+	if i := strings.LastIndex(idstr, "_"); i >= 0 {
+		prefix = idstr[:i]
+		uuidstr = idstr[i+1:]
 	}
+
 	// A 16-byte UUID never encodes to more than maxEncodedLen base58
 	// digits, so anything longer (or empty) is invalid before decoding.
 	// This also bounds decode work on adversarially long input.
-	if len(uuidstr) == 0 || len(uuidstr) > maxEncodedLen {
-		return XUID{}, ErrParse
+	if len(uuidstr) == 0 {
+		return XUID{}, fmt.Errorf("%w: empty identifier", ErrParse)
 	}
-	_str, err := decodeBase58(uuidstr)
+	if len(uuidstr) > maxEncodedLen {
+		return XUID{}, fmt.Errorf("%w: identifier length %d exceeds %d", ErrParse, len(uuidstr), maxEncodedLen)
+	}
+
+	decoded, err := decodeBase58(uuidstr)
 	if err != nil {
-		return XUID{}, ErrParse
+		return XUID{}, fmt.Errorf("%w: %v", ErrParse, err)
 	}
-	var _uuid uuid.UUID
-	if len(_str) != len(_uuid) {
-		return XUID{}, ErrParse
+	var id uuid.UUID
+	if len(decoded) != len(id) {
+		return XUID{}, fmt.Errorf("%w: decoded %d bytes, want %d", ErrParse, len(decoded), len(id))
 	}
-	copy(_uuid[:], _str)
-	return NewWith(_uuid, prefix)
+	copy(id[:], decoded)
+	return NewWith(id, prefix)
 }
 
 func MustParse(idstr string) XUID {
