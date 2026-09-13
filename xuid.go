@@ -4,7 +4,7 @@
 // - Sortable identifiers using UUIDv7 for chronological ordering
 // - Optional string prefixes for human-readable context (e.g., "user_", "order_")
 // - Base58 encoding for shorter, URL-safe representations
-// - Built-in JSON marshaling and unmarshaling support
+// - Built-in JSON marshaling/unmarshaling and text encoding support
 //
 // Example usage:
 //

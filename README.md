@@ -13,6 +13,7 @@ A Go package for generating compact, sortable UUID-based identifiers with option
 - 🏷️ **Optional Prefixes**: Add human-readable prefixes to your identifiers (e.g., `user_`, `order_`)
 - 📦 **Compact Encoding**: Uses base58 encoding for shorter, URL-safe strings
 - 🔄 **JSON Support**: Built-in JSON marshaling and unmarshaling
+- 🔤 **Text Support**: Implements `encoding.TextMarshaler`/`TextUnmarshaler` for YAML, TOML, XML and map keys
 - 🗄️ **SQL Database Support**: Seamless integration with SQL databases (PostgreSQL, MySQL, etc.)
 - ✅ **Type Safety**: Strong typing with validation and parsing utilities
 
@@ -188,6 +189,29 @@ data, _ := json.Marshal(user)
 var parsed User
 json.Unmarshal(data, &parsed)
 ```
+
+### Text Support
+
+`XUID` implements `encoding.TextMarshaler` and `encoding.TextUnmarshaler`, so it
+also works with text-based encoders (YAML, TOML, `encoding/xml`), templates, and
+as a JSON map key:
+
+```go
+id := xuid.MustNewSortable("user")
+
+// Use as a JSON map key.
+scores := map[xuid.XUID]int{id: 10}
+data, _ := json.Marshal(scores)
+// {"user_8M7Qq2vR3kGbF9wN5pL2xA":10}
+
+// Or marshal/unmarshal the text form directly.
+text, _ := id.MarshalText()
+var loaded xuid.XUID
+loaded.UnmarshalText(text)
+```
+
+A zero-value XUID marshals to an empty string, and an empty string unmarshals to
+the zero value, mirroring how JSON uses `null` and SQL uses `NULL`.
 
 ### SQL Support
 
