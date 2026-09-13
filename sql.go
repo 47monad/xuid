@@ -7,12 +7,18 @@ import (
 )
 
 // Value implements the driver.Valuer interface.
-// This allows XUID to be stored in SQL databases as UUID.
+//
+// It returns the 16 raw UUID bytes as a []byte so drivers store XUIDs in
+// binary UUID columns (BYTEA in PostgreSQL, BINARY(16) in MySQL) rather
+// than a text column. The prefix is not stored; restore it with WithPrefix
+// after scanning.
+//
+// A nil UUID is encoded as SQL NULL.
 func (x XUID) Value() (driver.Value, error) {
 	if x.uuid == uuid.Nil() {
 		return nil, nil
 	}
-	return x.uuid.String(), nil
+	return x.uuid[:], nil
 }
 
 // Scan implements the sql.Scanner interface.
