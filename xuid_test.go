@@ -819,13 +819,25 @@ func BenchmarkWithPrefix(b *testing.B) {
 // Inputs with a prefix that fails validation are skipped, since they
 // cannot be constructed in the first place.
 func FuzzParseRoundTrip(f *testing.F) {
+	// Unprefixed nil UUID.
+	f.Add("", []byte{})
+	// Prefixed nil UUID.
+	f.Add("user", slices.Repeat([]byte{0x00}, 16))
+	// Unprefixed max UUID (all 0xff).
+	f.Add("", slices.Repeat([]byte{0xff}, 16))
+	// Prefixed v4 (random) sample.
+	v4 := uuid.NewV4()
+	f.Add("user", v4[:])
+	// Prefixed v7 (sortable) sample.
+	v7 := uuid.NewV7()
+	f.Add("order", v7[:])
+	// Prefix with underscores, non-ASCII, and short raw payloads.
+	f.Add("user_profile", []byte{0xff})
+	f.Add("_", []byte{0x00})
 	f.Add("user", []byte{
 		0x01, 0x8f, 0x2a, 0x3b, 0x4c, 0x5d, 0x6e, 0x7f,
 		0x80, 0x91, 0xa2, 0xb3, 0xc4, 0xd5, 0xe6, 0xf7,
 	})
-	f.Add("", []byte{})
-	f.Add("user_profile", []byte{0xff})
-	f.Add("_", []byte{0x00})
 
 	f.Fuzz(func(t *testing.T, prefix string, raw []byte) {
 		var u uuid.UUID
@@ -842,5 +854,45 @@ func FuzzParseRoundTrip(f *testing.F) {
 		require.NoError(t, err)
 		assert.True(t, original.Equal(parsed),
 			"round trip mismatch: %q != %q", original.String(), parsed.String())
+	})
+}
+
+// FuzzParseNoPanic asserts the failure contract of Parse on arbitrary
+// input: it never panics, every rejected string produces an error that
+// wraps ErrParse, and anything it accepts survives a String/Parse round
+// trip. Inputs are decoded byte-for-byte, so non-ASCII and overlong
+// strings are exercised alongside well-formed identifiers.
+func FuzzParseNoPanic(f *testing.F) {
+	seeds := []string{
+		"",
+		"_",
+		"user_",
+		"user_2g",
+		"user_8M7Qq2vR3kGbF9wN5pL2xA",
+		"1",
+		strings.Repeat("1", 22),
+		strings.Repeat("z", 22),
+		strings.Repeat("z", 23),
+		"0OIl",
+		"user_2g_extra",
+		"üser_2g",
+		strings.Repeat("a", xuid.MaxPrefixLen+1) + "_2g",
+	}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+
+	f.Fuzz(func(t *testing.T, s string) {
+		got, err := xuid.Parse(s)
+		if err != nil {
+			require.ErrorIs(t, err, xuid.ErrParse)
+			assert.False(t, xuid.IsValid(s))
+			return
+		}
+
+		assert.True(t, xuid.IsValid(s))
+		// Anything Parse accepts must round-trip through String.
+		assert.True(t, xuid.MustParse(got.String()).Equal(got),
+			"round trip mismatch for %q", s)
 	})
 }
