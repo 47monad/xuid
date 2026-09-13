@@ -11,7 +11,7 @@ import (
 // It returns the 16 raw UUID bytes as a []byte so drivers store XUIDs in
 // binary UUID columns (BYTEA in PostgreSQL, BINARY(16) in MySQL) rather
 // than a text column. The prefix is not stored; restore it with WithPrefix
-// after scanning.
+// or MustWithPrefix after scanning.
 //
 // A nil UUID is encoded as SQL NULL.
 func (x XUID) Value() (driver.Value, error) {
@@ -32,12 +32,12 @@ func (x XUID) Value() (driver.Value, error) {
 //   - [16]byte or uuid.UUID (e.g. pgx's native UUID type)
 //
 // Note: The prefix information is lost when loading from database.
-// Restore prefixes with WithPrefix after loading, based on the table
-// or column the value was read from:
+// Restore prefixes with WithPrefix or MustWithPrefix after loading, based
+// on the table or column the value was read from:
 //
 //	var loaded xuid.XUID
 //	loaded.Scan(value)
-//	restored := loaded.WithPrefix("user")
+//	restored := loaded.MustWithPrefix("user")
 func (x *XUID) Scan(value interface{}) error {
 	if value == nil {
 		x.uuid = uuid.Nil()

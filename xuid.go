@@ -6,6 +6,9 @@
 // - Base58 encoding for shorter, URL-safe representations
 // - Built-in JSON marshaling/unmarshaling and text encoding support
 //
+// Prefixes are validated: they must be at most MaxPrefixLen bytes and
+// contain only [a-zA-Z0-9_]. See ValidatePrefix.
+//
 // Example usage:
 //
 //	// Create a sortable identifier with prefix
@@ -31,7 +34,37 @@ type XUID struct {
 	prefix string
 }
 
+// MaxPrefixLen is the maximum length, in bytes, of an XUID prefix.
+const MaxPrefixLen = 32
+
+// ValidatePrefix reports whether prefix is a valid XUID prefix.
+//
+// A prefix may be empty, meaning the identifier has no prefix.
+// Otherwise it must be at most MaxPrefixLen bytes long and contain
+// only ASCII letters, digits, and underscores ([a-zA-Z0-9_]). The
+// underscore is allowed because it is a common word separator and,
+// since Parse splits on the last underscore, a prefix containing
+// underscores still round-trips. Hyphens are deliberately not allowed.
+//
+// On failure it returns an error wrapping ErrInvalidPrefix.
+func ValidatePrefix(prefix string) error {
+	if len(prefix) > MaxPrefixLen {
+		return fmt.Errorf("%w: length %d exceeds %d", ErrInvalidPrefix, len(prefix), MaxPrefixLen)
+	}
+	for i := 0; i < len(prefix); i++ {
+		c := prefix[i]
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' {
+			continue
+		}
+		return fmt.Errorf("%w: invalid character %q", ErrInvalidPrefix, c)
+	}
+	return nil
+}
+
 func NewWith(id uuid.UUID, prefix string) (XUID, error) {
+	if err := ValidatePrefix(prefix); err != nil {
+		return XUID{}, err
+	}
 	return XUID{
 		uuid:   id,
 		prefix: prefix,
@@ -39,6 +72,9 @@ func NewWith(id uuid.UUID, prefix string) (XUID, error) {
 }
 
 func NewSortable(prefix string) (XUID, error) {
+	if err := ValidatePrefix(prefix); err != nil {
+		return XUID{}, err
+	}
 	return XUID{
 		uuid:   uuid.NewV7(),
 		prefix: prefix,
@@ -50,6 +86,9 @@ func MustNewSortable(prefix string) XUID {
 }
 
 func NewRandom(prefix string) (XUID, error) {
+	if err := ValidatePrefix(prefix); err != nil {
+		return XUID{}, err
+	}
 	return XUID{
 		uuid:   uuid.NewV4(),
 		prefix: prefix,
@@ -84,17 +123,37 @@ func (x XUID) GetPrefix() string {
 // It is the supported way to restore a prefix after loading the
 // underlying UUID from a database column, since Scan discards prefixes:
 //
-//	restored := xuid.MustParse(s).WithPrefix("user")
+//	restored, err := xuid.MustParse(s).WithPrefix("user")
 //
-// Being immutable, it chains off any value, including non-addressable
-// ones such as function results.
-func (x XUID) WithPrefix(prefix string) XUID {
+// The prefix is validated like it is in the constructors; an invalid
+// prefix returns an error wrapping ErrInvalidPrefix. Use MustWithPrefix
+// for a chainable, panic-on-error form:
+//
+//	restored := xuid.MustParse(s).MustWithPrefix("user")
+//
+// Being immutable, WithPrefix chains off any value, including
+// non-addressable ones such as function results.
+func (x XUID) WithPrefix(prefix string) (XUID, error) {
+	if err := ValidatePrefix(prefix); err != nil {
+		return XUID{}, err
+	}
 	x.prefix = prefix
-	return x
+	return x, nil
+}
+
+// MustWithPrefix returns a copy of x with the prefix set to prefix,
+// and panics if prefix is invalid. It is the chainable counterpart of
+// WithPrefix.
+func (x XUID) MustWithPrefix(prefix string) XUID {
+	return Must(x.WithPrefix(prefix))
 }
 
 // SetPrefix sets the prefix field to the specified prefix.
 // This is useful when loading XUIDs from database and need to restore the prefix.
+//
+// The prefix is not validated; an invalid prefix produces an XUID whose
+// String cannot be parsed back by Parse. Prefer WithPrefix, which
+// validates the prefix and reports an error.
 //
 // Deprecated: use WithPrefix instead. SetPrefix mixes mutation with
 // chaining semantics and cannot be chained off non-addressable values,
@@ -156,20 +215,29 @@ func Less(x, y XUID) bool {
 }
 
 // Parse decodes an XUID string. The final underscore separates the
-// optional prefix from the base58-encoded UUID, so any underscores
-// inside the prefix are preserved:
+// optional prefix from the base58-encoded UUID, so underscores inside
+// the prefix are preserved:
 //
 //	user_admin_8M7Qq2vR3kGbF9wN5pL2xA -> prefix "user_admin"
 //
+// The prefix must satisfy ValidatePrefix (at most MaxPrefixLen bytes of
+// [a-zA-Z0-9_]); otherwise the string is rejected. Because Parse
+// enforces the same rules, IsValid does too.
+//
 // Every failure wraps ErrParse with the underlying cause, so callers
 // can detect them with errors.Is(err, ErrParse) while still logging a
-// message that explains why parsing failed.
+// message that explains why parsing failed. Prefix failures also wrap
+// ErrInvalidPrefix, so errors.Is(err, ErrInvalidPrefix) works as well.
 func Parse(idstr string) (XUID, error) {
 	prefix := ""
 	uuidstr := idstr
 	if i := strings.LastIndex(idstr, "_"); i >= 0 {
 		prefix = idstr[:i]
 		uuidstr = idstr[i+1:]
+	}
+
+	if err := ValidatePrefix(prefix); err != nil {
+		return XUID{}, fmt.Errorf("%w: %w", ErrParse, err)
 	}
 
 	// A 16-byte UUID never encodes to more than maxEncodedLen base58

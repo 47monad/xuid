@@ -360,6 +360,46 @@ func TestParse(t *testing.T) {
 		assert.ErrorIs(t, err, xuid.ErrParse)
 		assert.ErrorContains(t, err, "exceeds 22")
 	})
+
+	t.Run("returns error for invalid prefix", func(t *testing.T) {
+		id, _ := xuid.NewSortable("user")
+		// Replace the valid prefix with one containing a disallowed
+		// character, keeping the same (valid) identifier part.
+		invalid := "bad-prefix_" + id.String()[len("user_"):]
+
+		_, err := xuid.Parse(invalid)
+
+		assert.ErrorIs(t, err, xuid.ErrParse)
+		assert.ErrorIs(t, err, xuid.ErrInvalidPrefix)
+
+		_, err = xuid.Parse(strings.Repeat("a", xuid.MaxPrefixLen+1) + "_" + id.String()[len("user_"):])
+		assert.ErrorIs(t, err, xuid.ErrInvalidPrefix)
+	})
+}
+
+func TestValidatePrefix(t *testing.T) {
+	t.Run("accepts empty prefix", func(t *testing.T) {
+		assert.NoError(t, xuid.ValidatePrefix(""))
+	})
+
+	t.Run("accepts letters, digits and underscores", func(t *testing.T) {
+		assert.NoError(t, xuid.ValidatePrefix("user_order_42"))
+		assert.NoError(t, xuid.ValidatePrefix("ABCxyz_0123"))
+	})
+
+	t.Run("accepts prefix at the maximum length", func(t *testing.T) {
+		assert.NoError(t, xuid.ValidatePrefix(strings.Repeat("a", xuid.MaxPrefixLen)))
+	})
+
+	t.Run("rejects prefix over the maximum length", func(t *testing.T) {
+		assert.ErrorIs(t, xuid.ValidatePrefix(strings.Repeat("a", xuid.MaxPrefixLen+1)), xuid.ErrInvalidPrefix)
+	})
+
+	t.Run("rejects hyphens and other characters", func(t *testing.T) {
+		for _, prefix := range []string{"user-profile", "user profile", "user.profile", "user\n", "üser"} {
+			assert.ErrorIs(t, xuid.ValidatePrefix(prefix), xuid.ErrInvalidPrefix, "prefix %q", prefix)
+		}
+	})
 }
 
 func TestIsValid(t *testing.T) {
@@ -376,6 +416,13 @@ func TestIsValid(t *testing.T) {
 
 	t.Run("returns false for empty string", func(t *testing.T) {
 		assert.False(t, xuid.IsValid(""))
+	})
+
+	t.Run("returns false for invalid prefix", func(t *testing.T) {
+		id, _ := xuid.NewSortable("user")
+		invalid := "bad-prefix_" + id.String()[len("user_"):]
+
+		assert.False(t, xuid.IsValid(invalid))
 	})
 }
 
@@ -522,8 +569,9 @@ func TestWithPrefix(t *testing.T) {
 	t.Run("WithPrefix sets prefix to XUID without prefix", func(t *testing.T) {
 		testXUID, _ := xuid.NewSortable("")
 
-		withPrefix := testXUID.WithPrefix("user")
+		withPrefix, err := testXUID.WithPrefix("user")
 
+		require.NoError(t, err)
 		assert.Equal(t, "user", withPrefix.GetPrefix())
 		assert.Equal(t, testXUID.GetUUID(), withPrefix.GetUUID())
 	})
@@ -531,16 +579,18 @@ func TestWithPrefix(t *testing.T) {
 	t.Run("WithPrefix replaces existing prefix", func(t *testing.T) {
 		testXUID, _ := xuid.NewSortable("old")
 
-		withNewPrefix := testXUID.WithPrefix("new")
+		withNewPrefix, err := testXUID.WithPrefix("new")
 
+		require.NoError(t, err)
 		assert.Equal(t, "new", withNewPrefix.GetPrefix())
 	})
 
 	t.Run("WithPrefix clears prefix when empty", func(t *testing.T) {
 		testXUID, _ := xuid.NewSortable("old")
 
-		withoutPrefix := testXUID.WithPrefix("")
+		withoutPrefix, err := testXUID.WithPrefix("")
 
+		require.NoError(t, err)
 		assert.Equal(t, "", withoutPrefix.GetPrefix())
 		assert.Equal(t, testXUID.GetUUID(), withoutPrefix.GetUUID())
 	})
@@ -548,20 +598,38 @@ func TestWithPrefix(t *testing.T) {
 	t.Run("WithPrefix leaves original unchanged", func(t *testing.T) {
 		testXUID, _ := xuid.NewSortable("old")
 
-		_ = testXUID.WithPrefix("new")
+		_, err := testXUID.WithPrefix("new")
 
+		require.NoError(t, err)
 		assert.Equal(t, "old", testXUID.GetPrefix())
 	})
 
-	t.Run("WithPrefix chains off non-addressable values", func(t *testing.T) {
+	t.Run("WithPrefix rejects invalid prefix", func(t *testing.T) {
+		testXUID, _ := xuid.NewSortable("old")
+
+		_, err := testXUID.WithPrefix("bad prefix")
+
+		assert.ErrorIs(t, err, xuid.ErrInvalidPrefix)
+		assert.Equal(t, "old", testXUID.GetPrefix())
+	})
+
+	t.Run("MustWithPrefix chains off non-addressable values", func(t *testing.T) {
 		original := xuid.MustNewSortable("user")
 
 		// MustParse returns a value (not a pointer), so the result is
 		// non-addressable and chaining must work without storing it
 		// in a variable first.
-		restored := xuid.MustParse(original.String()).WithPrefix("user")
+		restored := xuid.MustParse(original.String()).MustWithPrefix("user")
 
 		assert.True(t, original.Equal(restored))
+	})
+
+	t.Run("MustWithPrefix panics on invalid prefix", func(t *testing.T) {
+		testXUID, _ := xuid.NewSortable("old")
+
+		assert.Panics(t, func() {
+			testXUID.MustWithPrefix("bad prefix")
+		})
 	})
 }
 
@@ -578,17 +646,31 @@ func TestEdgeCases(t *testing.T) {
 		assert.NotEqual(t, str1, str2) // Different UUIDs
 	})
 
-	t.Run("handles very long prefix", func(t *testing.T) {
+	t.Run("rejects very long prefix", func(t *testing.T) {
 		longPrefix := strings.Repeat("a", 100)
-		id, err := xuid.NewSortable(longPrefix)
+		_, err := xuid.NewSortable(longPrefix)
 
-		require.NoError(t, err)
-		assert.Equal(t, longPrefix, id.GetPrefix())
-		assert.True(t, strings.HasPrefix(id.String(), longPrefix+"_"))
+		assert.ErrorIs(t, err, xuid.ErrInvalidPrefix)
 	})
 
-	t.Run("handles prefix with special characters", func(t *testing.T) {
+	t.Run("accepts prefix at the maximum length", func(t *testing.T) {
+		maxPrefix := strings.Repeat("a", xuid.MaxPrefixLen)
+		id, err := xuid.NewSortable(maxPrefix)
+
+		require.NoError(t, err)
+		assert.Equal(t, maxPrefix, id.GetPrefix())
+		assert.True(t, strings.HasPrefix(id.String(), maxPrefix+"_"))
+	})
+
+	t.Run("rejects prefix with special characters", func(t *testing.T) {
 		specialPrefix := "test-prefix.with_special@chars"
+		_, err := xuid.NewSortable(specialPrefix)
+
+		assert.ErrorIs(t, err, xuid.ErrInvalidPrefix)
+	})
+
+	t.Run("accepts prefix with underscores", func(t *testing.T) {
+		specialPrefix := "test_prefix_with_underscores"
 		id, err := xuid.NewSortable(specialPrefix)
 
 		require.NoError(t, err)
@@ -657,7 +739,7 @@ func BenchmarkWithPrefix(b *testing.B) {
 
 	b.Run("WithPrefix", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = id.WithPrefix("bench")
+			_, _ = id.WithPrefix("bench")
 		}
 	})
 }
@@ -666,6 +748,8 @@ func BenchmarkWithPrefix(b *testing.B) {
 // round trip: Parse(x.String()) must equal x. It fuzzes both the prefix
 // (including underscores and non-ASCII runes) and the raw UUID bytes, so
 // malformed prefixes or encodings cannot silently corrupt an identifier.
+// Inputs with a prefix that fails validation are skipped, since they
+// cannot be constructed in the first place.
 func FuzzParseRoundTrip(f *testing.F) {
 	f.Add("user", []byte{
 		0x01, 0x8f, 0x2a, 0x3b, 0x4c, 0x5d, 0x6e, 0x7f,
@@ -680,7 +764,11 @@ func FuzzParseRoundTrip(f *testing.F) {
 		copy(u[:], raw)
 
 		original, err := xuid.NewWith(u, prefix)
-		require.NoError(t, err)
+		if err != nil {
+			// Invalid prefixes are rejected by the constructor; there
+			// is no valid identifier to round-trip.
+			return
+		}
 
 		parsed, err := xuid.Parse(original.String())
 		require.NoError(t, err)

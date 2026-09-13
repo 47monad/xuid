@@ -131,6 +131,11 @@ if xuid.IsValid("user_8M7Qq2vR3kGbF9wN5pL2xA") {
     fmt.Println("Valid XUID")
 }
 
+// Validate a prefix on its own (used by the constructors and Parse)
+if err := xuid.ValidatePrefix("user"); err != nil {
+    fmt.Println("Invalid prefix:", err)
+}
+
 // Check if empty
 if xuid.IsEmpty(id) {
     fmt.Println("Empty XUID")
@@ -218,7 +223,7 @@ the zero value, mirroring how JSON uses `null` and SQL uses `NULL`.
 XUIDs integrate seamlessly with SQL databases such as PostgreSQL and MySQL. However, there are a few caveats to keep in mind:
 
 - **Only the UUID bytes are stored** — The 16-byte UUID is stored in the database as a []byte (e.g., BYTEA in PostgreSQL or BINARY(16) in MySQL). This ensures efficient storage and indexing.
-- **Prefixes are not stored** — Scanning a database value yields a XUID with an empty prefix. Restore the prefix with `WithPrefix` in your repository/DAO layer, based on the table or column the value was read from:
+- **Prefixes are not stored** — Scanning a database value yields a XUID with an empty prefix. Restore the prefix with `WithPrefix`/`MustWithPrefix` in your repository/DAO layer, based on the table or column the value was read from:
 
 ```go
 // Load from database
@@ -226,10 +231,15 @@ var loaded xuid.XUID
 loaded.Scan(value)
 
 // Restore prefix (the repo layer knows this column is a user ID)
-restored := loaded.WithPrefix("user")
+restored := loaded.MustWithPrefix("user")
+
+// WithPrefix validates and returns an error instead of panicking:
+if restored, err := loaded.WithPrefix("user"); err != nil {
+    // invalid prefix
+}
 ```
 
-`WithPrefix` is immutable: it returns a copy and chains off any value, including non-addressable ones such as `xuid.MustParse(s).WithPrefix("user")`. The older `SetPrefix` method is deprecated.
+`WithPrefix` validates the prefix exactly like the constructors and `Parse`, and returns `(XUID, error)`. It is immutable: it returns a copy. `MustWithPrefix` is the panic-on-error variant, so it chains off any value, including non-addressable ones such as `xuid.MustParse(s).MustWithPrefix("user")`. The older `SetPrefix` method is deprecated and does not validate.
 
 ## Format
 
@@ -237,6 +247,16 @@ XUIDs follow this format:
 
 - **Without prefix**: `8M7Qq2vR3kGbF9wN5pL2xA`
 - **With prefix**: `prefix_8M7Qq2vR3kGbF9wN5pL2xA`
+
+Prefixes are validated by every constructor and by `Parse`:
+
+- At most 32 bytes long (`xuid.MaxPrefixLen`).
+- Only ASCII letters, digits, and underscores: `[a-zA-Z0-9_]`. Hyphens are not allowed.
+- An empty prefix means the identifier has no prefix.
+
+Use `xuid.ValidatePrefix(s)` to check a prefix on its own without
+constructing an XUID. Because `Parse` applies the same rules, `IsValid`
+enforces them too.
 
 The identifier part is a base58-encoded UUID, making it:
 
@@ -250,8 +270,9 @@ The package defines sentinel errors:
 
 ```go
 var (
-    ErrParse = errors.New("XUID string cannot be parsed")
-    ErrScan  = errors.New("XUID cannot be scanned from a SQL value")
+    ErrParse         = errors.New("XUID string cannot be parsed")
+    ErrScan          = errors.New("XUID cannot be scanned from a SQL value")
+    ErrInvalidPrefix = errors.New("XUID prefix is invalid")
 )
 ```
 

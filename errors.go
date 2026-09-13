@@ -12,4 +12,10 @@ var (
 	// converted to an XUID. Scan wraps it with context, so failures can be
 	// detected with errors.Is(err, ErrScan).
 	ErrScan = errors.New("XUID cannot be scanned from a SQL value")
+
+	// ErrInvalidPrefix is returned when a prefix does not satisfy the
+	// rules enforced by ValidatePrefix. Constructors and Parse wrap it
+	// with context, so failures can be detected with
+	// errors.Is(err, ErrInvalidPrefix).
+	ErrInvalidPrefix = errors.New("XUID prefix is invalid")
 )
