@@ -72,6 +72,43 @@ func TestXUIDScan(t *testing.T) {
 		assert.Equal(t, "", id.GetPrefix()) // Prefix is lost when scanning
 	})
 
+	t.Run("scans UUID string delivered as byte slice", func(t *testing.T) {
+		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
+		var id xuid.XUID
+
+		// lib/pq returns UUID columns as a []byte holding the textual form.
+		err := id.Scan([]byte(testUUID.String()))
+
+		require.NoError(t, err)
+		assert.Equal(t, testUUID, id.GetUUID())
+		assert.Equal(t, "", id.GetPrefix()) // Prefix is lost when scanning
+	})
+
+	t.Run("scans 16-byte array successfully", func(t *testing.T) {
+		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
+		var raw [16]byte
+		copy(raw[:], testUUID[:])
+		var id xuid.XUID
+
+		// pgx surfaces its native UUID type as [16]byte.
+		err := id.Scan(raw)
+
+		require.NoError(t, err)
+		assert.Equal(t, testUUID, id.GetUUID())
+		assert.Equal(t, "", id.GetPrefix()) // Prefix is lost when scanning
+	})
+
+	t.Run("scans uuid.UUID successfully", func(t *testing.T) {
+		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
+		var id xuid.XUID
+
+		err := id.Scan(testUUID)
+
+		require.NoError(t, err)
+		assert.Equal(t, testUUID, id.GetUUID())
+		assert.Equal(t, "", id.GetPrefix()) // Prefix is lost when scanning
+	})
+
 	t.Run("scans nil value successfully", func(t *testing.T) {
 		var id xuid.XUID
 

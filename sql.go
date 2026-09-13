@@ -17,6 +17,14 @@ func (x XUID) Value() (driver.Value, error) {
 
 // Scan implements the sql.Scanner interface.
 // This allows XUID to be loaded from SQL databases.
+//
+// It accepts the shapes drivers actually deliver UUID columns in:
+//
+//   - string in UUID format
+//   - []byte of exactly 16 raw bytes
+//   - []byte containing a UUID string (e.g. lib/pq)
+//   - [16]byte or uuid.UUID (e.g. pgx's native UUID type)
+//
 // Note: The prefix information is lost when loading from database.
 // Restore prefixes with WithPrefix after loading, based on the table
 // or column the value was read from:
@@ -41,11 +49,28 @@ func (x *XUID) Scan(value interface{}) error {
 		x.prefix = ""
 		return nil
 	case []byte:
-		if len(d) != 16 {
-			return fmt.Errorf("%w: invalid UUID byte length %d, want 16", ErrScan, len(d))
+		var id uuid.UUID
+		if len(d) == 16 {
+			copy(id[:], d)
+		} else {
+			// Drivers such as lib/pq deliver UUID columns as a []byte
+			// holding the textual form rather than the 16 raw bytes.
+			var err error
+			id, err = uuid.Parse(string(d))
+			if err != nil {
+				return fmt.Errorf("%w: invalid UUID bytes %q", ErrScan, d)
+			}
 		}
-		copy(x.uuid[:], d)
+		x.uuid = id
 		x.prefix = "" // Prefix is lost when loading from database
+		return nil
+	case [16]byte:
+		x.uuid = uuid.UUID(d)
+		x.prefix = ""
+		return nil
+	case uuid.UUID:
+		x.uuid = d
+		x.prefix = ""
 		return nil
 	}
 
