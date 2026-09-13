@@ -156,7 +156,7 @@ func TestXUIDWithPrefix(t *testing.T) {
 		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
 		original, _ := xuid.NewWith(testUUID, "")
 
-		withPrefix := original.WithPrefix("user")
+		withPrefix := original.MustWithPrefix("user")
 
 		assert.Equal(t, testUUID, withPrefix.GetUUID())
 		assert.Equal(t, "user", withPrefix.GetPrefix())
@@ -166,7 +166,7 @@ func TestXUIDWithPrefix(t *testing.T) {
 		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
 		original, _ := xuid.NewWith(testUUID, "old_prefix")
 
-		withNewPrefix := original.WithPrefix("new_prefix")
+		withNewPrefix := original.MustWithPrefix("new_prefix")
 
 		assert.Equal(t, testUUID, withNewPrefix.GetUUID())
 		assert.Equal(t, "new_prefix", withNewPrefix.GetPrefix())
@@ -176,7 +176,7 @@ func TestXUIDWithPrefix(t *testing.T) {
 		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
 		original, _ := xuid.NewWith(testUUID, "old_prefix")
 
-		withoutPrefix := original.WithPrefix("")
+		withoutPrefix := original.MustWithPrefix("")
 
 		assert.Equal(t, testUUID, withoutPrefix.GetUUID())
 		assert.Equal(t, "", withoutPrefix.GetPrefix())
@@ -203,7 +203,7 @@ func TestSQLRoundTrip(t *testing.T) {
 		assert.Equal(t, "", loaded.GetPrefix())
 
 		// Restore prefix after loading
-		restored := loaded.WithPrefix("user")
+		restored := loaded.MustWithPrefix("user")
 		assert.Equal(t, original.GetUUID(), restored.GetUUID())
 		assert.Equal(t, original.GetPrefix(), restored.GetPrefix())
 		assert.True(t, original.Equal(restored))
@@ -248,8 +248,8 @@ func TestSQLUsagePatterns(t *testing.T) {
 		loadedOrderID.Scan(orderValue)
 
 		// 4. Restore prefixes based on context (table/column knowledge)
-		restoredUserID := loadedUserID.WithPrefix("user")
-		restoredOrderID := loadedOrderID.WithPrefix("order")
+		restoredUserID := loadedUserID.MustWithPrefix("user")
+		restoredOrderID := loadedOrderID.MustWithPrefix("order")
 
 		// 5. Verify restoration
 		assert.True(t, userID.Equal(restoredUserID))
@@ -265,7 +265,7 @@ func TestSQLUsagePatterns(t *testing.T) {
 		loaded.Scan(value)
 
 		// In your repository/DAO layer:
-		restoredFromUsersTable := loaded.WithPrefix("user")
+		restoredFromUsersTable := loaded.MustWithPrefix("user")
 		assert.Equal(t, "user", restoredFromUsersTable.GetPrefix())
 
 		// Strategy 2: Store prefix separately if needed
@@ -274,7 +274,7 @@ func TestSQLUsagePatterns(t *testing.T) {
 		// You could store this in a separate column if prefix variety is needed
 
 		// Strategy 3: Use WithPrefix("") for prefix-agnostic operations
-		withoutPrefix := userID.WithPrefix("")
+		withoutPrefix := userID.MustWithPrefix("")
 		assert.Equal(t, "", withoutPrefix.GetPrefix())
 		assert.Equal(t, userID.GetUUID(), withoutPrefix.GetUUID())
 	})
