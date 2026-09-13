@@ -99,12 +99,19 @@ func TestNewWith(t *testing.T) {
 		assert.Equal(t, "custom", id.GetPrefix())
 	})
 
-	t.Run("creates XUID with nil UUID", func(t *testing.T) {
-		id, err := xuid.NewWith(uuid.Nil(), "empty")
+	t.Run("creates XUID with nil UUID and empty prefix", func(t *testing.T) {
+		id, err := xuid.NewWith(uuid.Nil(), "")
 
 		require.NoError(t, err)
 		assert.Equal(t, uuid.Nil(), id.GetUUID())
-		assert.Equal(t, "empty", id.GetPrefix())
+		assert.Equal(t, "", id.GetPrefix())
+	})
+
+	t.Run("rejects nil UUID with a prefix", func(t *testing.T) {
+		id, err := xuid.NewWith(uuid.Nil(), "empty")
+
+		assert.ErrorIs(t, err, xuid.ErrNilUUIDWithPrefix)
+		assert.Equal(t, xuid.XUID{}, id)
 	})
 
 	t.Run("creates XUID without prefix", func(t *testing.T) {
@@ -326,6 +333,22 @@ func TestParse(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, original.Equal(parsed))
 		assert.Equal(t, "user_profile", parsed.GetPrefix())
+	})
+
+	t.Run("parses the unprefixed nil UUID string", func(t *testing.T) {
+		parsed, err := xuid.Parse("1111111111111111")
+
+		require.NoError(t, err)
+		assert.True(t, xuid.IsEmpty(parsed))
+		assert.Equal(t, "", parsed.GetPrefix())
+	})
+
+	t.Run("rejects a prefixed nil UUID string", func(t *testing.T) {
+		_, err := xuid.Parse("user_1111111111111111")
+
+		assert.ErrorIs(t, err, xuid.ErrParse)
+		assert.ErrorIs(t, err, xuid.ErrNilUUIDWithPrefix)
+		assert.False(t, xuid.IsValid("user_1111111111111111"))
 	})
 
 	t.Run("returns error for invalid XUID string", func(t *testing.T) {
@@ -681,6 +704,26 @@ func TestWithPrefix(t *testing.T) {
 		assert.Equal(t, "old", testXUID.GetPrefix())
 	})
 
+	t.Run("WithPrefix rejects a prefix on the nil UUID", func(t *testing.T) {
+		nilXUID, err := xuid.NilUUID()
+		require.NoError(t, err)
+
+		_, err = nilXUID.WithPrefix("user")
+
+		assert.ErrorIs(t, err, xuid.ErrNilUUIDWithPrefix)
+	})
+
+	t.Run("WithPrefix clears the prefix on the nil UUID", func(t *testing.T) {
+		nilXUID, err := xuid.NilUUID()
+		require.NoError(t, err)
+
+		cleared, err := nilXUID.WithPrefix("")
+
+		require.NoError(t, err)
+		assert.True(t, xuid.IsEmpty(cleared))
+		assert.Equal(t, "", cleared.GetPrefix())
+	})
+
 	t.Run("MustWithPrefix chains off non-addressable values", func(t *testing.T) {
 		original := xuid.MustNewSortable("user")
 
@@ -697,6 +740,15 @@ func TestWithPrefix(t *testing.T) {
 
 		assert.Panics(t, func() {
 			testXUID.MustWithPrefix("bad prefix")
+		})
+	})
+
+	t.Run("MustWithPrefix panics on a prefixed nil UUID", func(t *testing.T) {
+		nilXUID, err := xuid.NilUUID()
+		require.NoError(t, err)
+
+		assert.Panics(t, func() {
+			nilXUID.MustWithPrefix("user")
 		})
 	})
 }
@@ -821,8 +873,8 @@ func BenchmarkWithPrefix(b *testing.B) {
 func FuzzParseRoundTrip(f *testing.F) {
 	// Unprefixed nil UUID.
 	f.Add("", []byte{})
-	// Prefixed nil UUID.
-	f.Add("user", slices.Repeat([]byte{0x00}, 16))
+	// Prefixed non-nil UUID (a prefixed nil UUID is rejected on purpose).
+	f.Add("user", []byte{0, 0, 0, 0, 0, 0, 0x70, 0, 0x80, 0, 0, 0, 0, 0, 0, 0x01})
 	// Unprefixed max UUID (all 0xff).
 	f.Add("", slices.Repeat([]byte{0xff}, 16))
 	// Prefixed v4 (random) sample.

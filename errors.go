@@ -19,6 +19,14 @@ var (
 	// errors.Is(err, ErrInvalidPrefix).
 	ErrInvalidPrefix = errors.New("XUID prefix is invalid")
 
+	// ErrNilUUIDWithPrefix is returned when a non-empty prefix is combined
+	// with the nil UUID. A nil UUID represents an absent identifier and
+	// never carries a prefix: JSON, text and SQL all encode it as
+	// null/empty, so a prefixed nil UUID cannot round-trip. Constructors,
+	// Parse and WithPrefix wrap it with context, so failures can be
+	// detected with errors.Is(err, ErrNilUUIDWithPrefix).
+	ErrNilUUIDWithPrefix = errors.New("XUID cannot combine the nil UUID with a prefix")
+
 	// ErrNotSortable is returned by Time when the XUID does not embed a
 	// UUIDv7 timestamp, such as a UUIDv4 or the nil UUID. Time wraps it
 	// with context, so failures can be detected with

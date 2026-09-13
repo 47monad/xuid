@@ -92,6 +92,12 @@ id, err := xuid.NewWith(existingUUID, "custom")
 nilID, err := xuid.NilUUID()
 ```
 
+A nil UUID represents an absent identifier and never carries a prefix. `NewWith`
+rejects a non-empty prefix on the nil UUID (wrapping `ErrNilUUIDWithPrefix`),
+and `Parse` rejects strings such as `user_1111111111111111` whose decoded UUID
+is the nil UUID. This keeps the nil UUID encodable as `null`/empty by JSON, text
+and SQL without losing information.
+
 ### Working with XUIDs
 
 #### String Representation
@@ -242,7 +248,7 @@ if restored, err := loaded.WithPrefix("user"); err != nil {
 }
 ```
 
-`WithPrefix` validates the prefix exactly like the constructors and `Parse`, and returns `(XUID, error)`. It is immutable: it returns a copy. `MustWithPrefix` is the panic-on-error variant, so it chains off any value, including non-addressable ones such as `xuid.MustParse(s).MustWithPrefix("user")`. The older `SetPrefix` method is deprecated and does not validate.
+`WithPrefix` validates the prefix exactly like the constructors and `Parse`, and returns `(XUID, error)`. It is immutable: it returns a copy. Like the constructors, it rejects a non-empty prefix on the nil UUID (`ErrNilUUIDWithPrefix`). `MustWithPrefix` is the panic-on-error variant, so it chains off any value, including non-addressable ones such as `xuid.MustParse(s).MustWithPrefix("user")`. The older `SetPrefix` method is deprecated and does not validate (and does not enforce the nil-UUID/prefix invariant).
 
 #### Nullable Columns
 
@@ -286,6 +292,9 @@ Prefixes are validated by every constructor and by `Parse`:
 - At most 32 bytes long (`xuid.MaxPrefixLen`).
 - Only ASCII letters, digits, and underscores: `[a-zA-Z0-9_]`. Hyphens are not allowed.
 - An empty prefix means the identifier has no prefix.
+- A non-empty prefix is only allowed on a non-nil UUID. The nil UUID (the empty
+  XUID) always has an empty prefix, so `NewWith(uuid.Nil(), "user")` and
+  `Parse("user_1111111111111111")` are rejected.
 
 Use `xuid.ValidatePrefix(s)` to check a prefix on its own without
 constructing an XUID. Because `Parse` applies the same rules, `IsValid`
@@ -303,10 +312,11 @@ The package defines sentinel errors:
 
 ```go
 var (
-    ErrParse         = errors.New("XUID string cannot be parsed")
-    ErrScan          = errors.New("XUID cannot be scanned from a SQL value")
-    ErrInvalidPrefix = errors.New("XUID prefix is invalid")
-    ErrNotSortable   = errors.New("XUID does not embed a sortable timestamp")
+    ErrParse             = errors.New("XUID string cannot be parsed")
+    ErrScan              = errors.New("XUID cannot be scanned from a SQL value")
+    ErrInvalidPrefix     = errors.New("XUID prefix is invalid")
+    ErrNilUUIDWithPrefix = errors.New("XUID cannot combine the nil UUID with a prefix")
+    ErrNotSortable       = errors.New("XUID does not embed a sortable timestamp")
 )
 ```
 
