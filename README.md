@@ -115,6 +115,9 @@ prefix := id.GetPrefix() // "user"
 // Check UUID version
 isSortable := id.IsSortable() // true for UUIDv7
 isRandom := id.IsRandom()     // true for UUIDv4
+
+// Extract the creation instant from a UUIDv7 (errors for other versions)
+created, err := id.Time()
 ```
 
 #### Parsing and Validation
@@ -241,6 +244,36 @@ if restored, err := loaded.WithPrefix("user"); err != nil {
 
 `WithPrefix` validates the prefix exactly like the constructors and `Parse`, and returns `(XUID, error)`. It is immutable: it returns a copy. `MustWithPrefix` is the panic-on-error variant, so it chains off any value, including non-addressable ones such as `xuid.MustParse(s).MustWithPrefix("user")`. The older `SetPrefix` method is deprecated and does not validate.
 
+#### Nullable Columns
+
+Because `XUID.Value` maps a nil UUID to SQL `NULL`, a plain `XUID` cannot
+distinguish a `NULL` column from an all-zero UUID. Use `NullXUID` for
+nullable columns:
+
+```go
+type User struct {
+    ID xuid.NullXUID `db:"id"`
+}
+
+// Scan (NULL sets Valid to false)
+var id xuid.NullXUID
+if err := id.Scan(dbValue); err != nil {
+    log.Fatal(err)
+}
+if id.Valid {
+    fmt.Println("user ID:", id.XUID)
+}
+
+// Value (NULL when Valid is false)
+value, err := id.Value()
+```
+
+`NullXUID` implements `driver.Valuer` and `sql.Scanner`, and mirrors the
+standard library's `sql.Null*` types. `Valid` is authoritative: a
+`NullXUID` with `Valid` set is stored as non-`NULL`, even when it holds the
+nil UUID. Assign its `XUID` field to get at the underlying identifier;
+prefixes are still lost on scan and can be restored with `WithPrefix`.
+
 ## Format
 
 XUIDs follow this format:
@@ -273,6 +306,7 @@ var (
     ErrParse         = errors.New("XUID string cannot be parsed")
     ErrScan          = errors.New("XUID cannot be scanned from a SQL value")
     ErrInvalidPrefix = errors.New("XUID prefix is invalid")
+    ErrNotSortable   = errors.New("XUID does not embed a sortable timestamp")
 )
 ```
 

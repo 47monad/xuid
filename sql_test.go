@@ -151,6 +151,116 @@ func TestXUIDScan(t *testing.T) {
 	})
 }
 
+func TestNullXUID(t *testing.T) {
+	t.Run("Value returns nil when invalid", func(t *testing.T) {
+		var n xuid.NullXUID
+
+		value, err := n.Value()
+
+		require.NoError(t, err)
+		assert.Nil(t, value)
+	})
+
+	t.Run("Value returns raw UUID bytes when valid", func(t *testing.T) {
+		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
+		id, _ := xuid.NewWith(testUUID, "user")
+		n := xuid.NullXUID{XUID: id, Valid: true}
+
+		value, err := n.Value()
+
+		require.NoError(t, err)
+		assert.Equal(t, testUUID[:], value)
+		assert.IsType(t, []byte{}, value)
+		assert.Len(t, value, 16)
+	})
+
+	t.Run("Value keeps a valid nil UUID distinct from NULL", func(t *testing.T) {
+		id, _ := xuid.NilUUID()
+		n := xuid.NullXUID{XUID: id, Valid: true}
+
+		value, err := n.Value()
+
+		require.NoError(t, err)
+		assert.Equal(t, make([]byte, 16), value)
+	})
+
+	t.Run("Scan of NULL clears the value and Valid", func(t *testing.T) {
+		id := xuid.MustNewSortable("user")
+		n := xuid.NullXUID{XUID: id, Valid: true}
+
+		err := n.Scan(nil)
+
+		require.NoError(t, err)
+		assert.False(t, n.Valid)
+		assert.True(t, xuid.IsEmpty(n.XUID))
+	})
+
+	t.Run("Scan accepts the shapes XUID.Scan accepts", func(t *testing.T) {
+		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
+		raw := testUUID[:]
+
+		values := map[string]interface{}{
+			"uuid string":   testUUID.String(),
+			"raw bytes":     raw,
+			"16-byte array": [16]byte(raw),
+			"uuid.UUID":     testUUID,
+		}
+
+		for name, value := range values {
+			t.Run(name, func(t *testing.T) {
+				var n xuid.NullXUID
+
+				err := n.Scan(value)
+
+				require.NoError(t, err)
+				assert.True(t, n.Valid)
+				assert.Equal(t, testUUID, n.XUID.GetUUID())
+				assert.Equal(t, "", n.XUID.GetPrefix())
+			})
+		}
+	})
+
+	t.Run("Scan returns ErrScan and stays invalid for bad input", func(t *testing.T) {
+		var n xuid.NullXUID
+
+		err := n.Scan("not-a-uuid")
+
+		assert.ErrorIs(t, err, xuid.ErrScan)
+		assert.False(t, n.Valid)
+		assert.True(t, xuid.IsEmpty(n.XUID))
+	})
+
+	t.Run("round trips NULL", func(t *testing.T) {
+		var original xuid.NullXUID
+
+		value, err := original.Value()
+		require.NoError(t, err)
+		assert.Nil(t, value)
+
+		var loaded xuid.NullXUID
+		require.NoError(t, loaded.Scan(value))
+		assert.False(t, loaded.Valid)
+	})
+
+	t.Run("round trips a value", func(t *testing.T) {
+		original := xuid.NullXUID{XUID: xuid.MustNewSortable("user"), Valid: true}
+
+		value, err := original.Value()
+		require.NoError(t, err)
+
+		var loaded xuid.NullXUID
+		require.NoError(t, loaded.Scan(value))
+
+		assert.True(t, loaded.Valid)
+		assert.True(t, original.XUID.EqualUUID(loaded.XUID))
+	})
+
+	t.Run("implements driver.Valuer and sql.Scanner", func(t *testing.T) {
+		var _ driver.Valuer = xuid.NullXUID{}
+		var _ sql.Scanner = (*xuid.NullXUID)(nil)
+	})
+}
+
 func TestXUIDWithPrefix(t *testing.T) {
 	t.Run("adds prefix to existing XUID", func(t *testing.T) {
 		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")

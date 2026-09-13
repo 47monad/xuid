@@ -544,6 +544,74 @@ func TestVersionChecking(t *testing.T) {
 	})
 }
 
+func TestTime(t *testing.T) {
+	t.Run("returns the embedded millisecond timestamp", func(t *testing.T) {
+		want := time.Date(2024, 3, 14, 15, 9, 26, 0, time.UTC)
+		id := mustXUIDv7At(t, want)
+
+		got, err := id.Time()
+
+		require.NoError(t, err)
+		assert.Equal(t, want.UnixMilli(), got.UnixMilli())
+	})
+
+	t.Run("tracks creation time for sortable XUIDs", func(t *testing.T) {
+		before := time.Now().Add(-time.Second)
+		id := xuid.MustNewSortable("user")
+		after := time.Now().Add(time.Second)
+
+		got, err := id.Time()
+
+		require.NoError(t, err)
+		assert.False(t, got.Before(before))
+		assert.False(t, got.After(after))
+	})
+
+	t.Run("ignores the prefix", func(t *testing.T) {
+		want := time.Date(2024, 3, 14, 15, 9, 26, 0, time.UTC)
+		id := mustXUIDv7At(t, want).MustWithPrefix("order")
+
+		got, err := id.Time()
+
+		require.NoError(t, err)
+		assert.Equal(t, want.UnixMilli(), got.UnixMilli())
+	})
+
+	t.Run("returns ErrNotSortable for random UUID", func(t *testing.T) {
+		id, _ := xuid.NewRandom("session")
+
+		_, err := id.Time()
+
+		assert.ErrorIs(t, err, xuid.ErrNotSortable)
+	})
+
+	t.Run("returns ErrNotSortable for nil UUID", func(t *testing.T) {
+		id, _ := xuid.NilUUID()
+
+		_, err := id.Time()
+
+		assert.ErrorIs(t, err, xuid.ErrNotSortable)
+	})
+}
+
+// mustXUIDv7At builds a UUIDv7 XUID whose 48-bit timestamp encodes at.
+func mustXUIDv7At(t *testing.T, at time.Time) xuid.XUID {
+	t.Helper()
+
+	ms := at.UnixMilli()
+	var raw [16]byte
+	for i := 5; i >= 0; i-- {
+		raw[i] = byte(ms)
+		ms >>= 8
+	}
+	raw[6] = 0x70 // version 7
+	raw[8] = 0x80 // RFC 9562 variant
+
+	id, err := xuid.NewWith(uuid.UUID(raw), "user")
+	require.NoError(t, err)
+	return id
+}
+
 func TestGetters(t *testing.T) {
 	t.Run("GetUUID returns correct UUID", func(t *testing.T) {
 		testUUID := uuid.New()
