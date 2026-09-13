@@ -18,4 +18,11 @@ var (
 	// with context, so failures can be detected with
 	// errors.Is(err, ErrInvalidPrefix).
 	ErrInvalidPrefix = errors.New("XUID prefix is invalid")
+
+	// ErrNotSortable is returned by Time when the XUID does not embed a
+	// UUIDv7 timestamp, such as a UUIDv4 or the nil UUID. Time wraps it
+	// with context, so failures can be detected with
+	// errors.Is(err, ErrNotSortable), and IsSortable can be used to check
+	// first.
+	ErrNotSortable = errors.New("XUID does not embed a sortable timestamp")
 )

@@ -21,6 +21,56 @@ func (x XUID) Value() (driver.Value, error) {
 	return x.uuid[:], nil
 }
 
+// NullXUID represents an XUID that may be NULL in a SQL database. It is
+// the XUID counterpart to sql.NullString and implements driver.Valuer and
+// sql.Scanner, so it can be used both as a query argument and as a scan
+// destination for a nullable UUID column.
+//
+// Valid reports whether the value is not NULL, mirroring the other
+// sql.Null* types. Unlike XUID.Value, which maps a nil UUID to NULL,
+// NullXUID treats Valid as the single source of truth: with Valid set, its
+// Value is non-NULL even when it holds the nil UUID, so a non-NULL all-zero
+// UUID round-trips without collapsing to NULL.
+type NullXUID struct {
+	XUID  XUID
+	Valid bool
+}
+
+// Value implements the driver.Valuer interface. It returns SQL NULL when
+// Valid is false, and the 16 raw UUID bytes otherwise.
+func (n NullXUID) Value() (driver.Value, error) {
+	if !n.Valid {
+		return nil, nil
+	}
+	id := n.XUID.GetUUID()
+	return id[:], nil
+}
+
+// Scan implements the sql.Scanner interface. A NULL value sets Valid to
+// false and leaves the XUID at its zero value. Any supported non-NULL value
+// is scanned with XUID.Scan and sets Valid to true.
+//
+// As with XUID.Scan, the prefix is not stored in the database and is lost
+// when scanning; restore it with WithPrefix or MustWithPrefix based on the
+// table or column the value was read from.
+func (n *NullXUID) Scan(value interface{}) error {
+	if value == nil {
+		n.XUID = XUID{}
+		n.Valid = false
+		return nil
+	}
+
+	var id XUID
+	if err := id.Scan(value); err != nil {
+		n.XUID = XUID{}
+		n.Valid = false
+		return err
+	}
+	n.XUID = id
+	n.Valid = true
+	return nil
+}
+
 // Scan implements the sql.Scanner interface.
 // This allows XUID to be loaded from SQL databases.
 //

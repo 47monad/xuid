@@ -26,6 +26,7 @@ package xuid
 import (
 	"fmt"
 	"strings"
+	"time"
 	"uuid"
 )
 
@@ -113,6 +114,30 @@ func (x XUID) IsSortable() bool {
 
 func (x XUID) IsRandom() bool {
 	return x.uuid[6]>>4 == 4
+}
+
+// Time returns the instant encoded in a UUIDv7 identifier's 48-bit
+// millisecond timestamp. Because NewSortable generates UUIDv7 identifiers,
+// their Time is the moment the identifier was created.
+//
+// It returns the zero time and an error wrapping ErrNotSortable if x does
+// not embed a UUIDv7 timestamp, such as a UUIDv4 or the nil UUID. Use
+// IsSortable to check first when a zero time is not an option:
+//
+//	if id.IsSortable() {
+//		created, _ := id.Time()
+//	}
+func (x XUID) Time() (time.Time, error) {
+	if !x.IsSortable() {
+		return time.Time{}, fmt.Errorf("%w: UUID version is not 7", ErrNotSortable)
+	}
+	ms := int64(x.uuid[0])<<40 |
+		int64(x.uuid[1])<<32 |
+		int64(x.uuid[2])<<24 |
+		int64(x.uuid[3])<<16 |
+		int64(x.uuid[4])<<8 |
+		int64(x.uuid[5])
+	return time.UnixMilli(ms), nil
 }
 
 func (x XUID) GetPrefix() string {
