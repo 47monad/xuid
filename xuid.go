@@ -14,10 +14,10 @@
 //
 //	// Create a sortable identifier with prefix
 //	userID := xuid.MustNewSortable("user")
-//	fmt.Println(userID.String()) // user_8M7Qq2vR3kGbF9wN5pL2xA
+//	fmt.Println(userID.String()) // e.g. user_Cf1k9VmUZGg55baoJFXnT
 //
 //	// Parse from string
-//	parsed, err := xuid.Parse("user_8M7Qq2vR3kGbF9wN5pL2xA")
+//	parsed, err := xuid.Parse("user_Cf1k9VmUZGg55baoJFXnT")
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -264,7 +264,7 @@ func Less(x, y XUID) bool {
 // optional prefix from the base58-encoded UUID, so underscores inside
 // the prefix are preserved:
 //
-//	user_admin_8M7Qq2vR3kGbF9wN5pL2xA -> prefix "user_admin"
+//	user_admin_Cf1k9VmUZGg55baoJFXnT -> prefix "user_admin"
 //
 // The prefix must satisfy ValidatePrefix (at most MaxPrefixLen bytes of
 // [a-zA-Z0-9_]); otherwise the string is rejected. A string whose

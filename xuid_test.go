@@ -144,7 +144,6 @@ func TestXUIDString(t *testing.T) {
 		str := id.String()
 
 		assert.True(t, strings.HasPrefix(str, "test_"))
-		assert.Contains(t, str, "_")
 		parts := strings.Split(str, "_")
 		assert.Len(t, parts, 2)
 		assert.Equal(t, "test", parts[0])
@@ -856,12 +855,11 @@ func BenchmarkJSONUnmarshal(b *testing.B) {
 
 func BenchmarkWithPrefix(b *testing.B) {
 	id := xuid.MustNewSortable("bench")
+	b.ResetTimer()
 
-	b.Run("WithPrefix", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			_, _ = id.WithPrefix("bench")
-		}
-	})
+	for i := 0; i < b.N; i++ {
+		_, _ = id.WithPrefix("bench")
+	}
 }
 
 // FuzzParseRoundTrip asserts that every XUID survives a String/Parse

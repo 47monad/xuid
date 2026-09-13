@@ -34,17 +34,19 @@ import (
 )
 
 func main() {
-    // Generate a sortable XUID with prefix
+    // Generate a sortable XUID with prefix. The UUID is random, so the
+    // exact output varies; it is always "user_" followed by at most 22
+    // base58 characters.
     id := xuid.MustNewSortable("user")
-    fmt.Println(id.String()) // Output: user_8M7Qq2vR3kGbF9wN5pL2xA
+    fmt.Println(id.String()) // e.g. user_Cf1k9VmUZGg55baoJFXnT
 
-    // Generate a random XUID
+    // Generate a random XUID.
     randomID, _ := xuid.NewRandom("session")
-    fmt.Println(randomID.String()) // Output: session_5K9Mm1nP7jDcE8vL3qR6yB
+    fmt.Println(randomID.String()) // e.g. session_8QMBv8hxcm3BpPJ9wYgzNt
 
-    // Parse an existing XUID string
-    parsed, _ := xuid.Parse("user_8M7Qq2vR3kGbF9wN5pL2xA")
-    fmt.Println(parsed.GetPrefix()) // Output: user
+    // Parse an existing XUID string.
+    parsed, _ := xuid.Parse("user_Cf1k9VmUZGg55baoJFXnT")
+    fmt.Println(parsed.GetPrefix()) // user
 }
 ```
 
@@ -104,7 +106,7 @@ and SQL without losing information.
 
 ```go
 id := xuid.MustNewSortable("user")
-fmt.Println(id.String()) // user_8M7Qq2vR3kGbF9wN5pL2xA
+fmt.Println(id.String()) // e.g. user_Cf1k9VmUZGg55baoJFXnT
 ```
 
 #### Access Properties
@@ -130,13 +132,13 @@ created, err := id.Time()
 
 ```go
 // Parse a XUID string
-id, err := xuid.Parse("user_8M7Qq2vR3kGbF9wN5pL2xA")
+id, err := xuid.Parse("user_Cf1k9VmUZGg55baoJFXnT")
 if err != nil {
     log.Fatal(err)
 }
 
 // Validate a XUID string
-if xuid.IsValid("user_8M7Qq2vR3kGbF9wN5pL2xA") {
+if xuid.IsValid("user_Cf1k9VmUZGg55baoJFXnT") {
     fmt.Println("Valid XUID")
 }
 
@@ -197,7 +199,7 @@ user := User{
 
 // Marshal to JSON
 data, _ := json.Marshal(user)
-// {"id":"user_8M7Qq2vR3kGbF9wN5pL2xA","name":"John Doe"}
+// {"id":"user_Cf1k9VmUZGg55baoJFXnT","name":"John Doe"}
 
 // Unmarshal from JSON
 var parsed User
@@ -216,7 +218,7 @@ id := xuid.MustNewSortable("user")
 // Use as a JSON map key.
 scores := map[xuid.XUID]int{id: 10}
 data, _ := json.Marshal(scores)
-// {"user_8M7Qq2vR3kGbF9wN5pL2xA":10}
+// {"user_Cf1k9VmUZGg55baoJFXnT":10}
 
 // Or marshal/unmarshal the text form directly.
 text, _ := id.MarshalText()
@@ -284,8 +286,8 @@ prefixes are still lost on scan and can be restored with `WithPrefix`.
 
 XUIDs follow this format:
 
-- **Without prefix**: `8M7Qq2vR3kGbF9wN5pL2xA`
-- **With prefix**: `prefix_8M7Qq2vR3kGbF9wN5pL2xA`
+- **Without prefix**: `Cf1k9VmUZGg55baoJFXnT`
+- **With prefix**: `prefix_Cf1k9VmUZGg55baoJFXnT`
 
 Prefixes are validated by every constructor and by `Parse`:
 
@@ -302,9 +304,13 @@ enforces them too.
 
 The identifier part is a base58-encoded UUID, making it:
 
-- **Shorter** than standard UUID strings (22 characters vs 36)
+- **Shorter** than standard UUID strings (at most 22 characters vs 36)
 - **URL-safe** (no special characters that need encoding)
 - **Case-sensitive** but avoids confusing characters (0, O, I, l)
+
+The base58 encoding is not zero-padded, so its length varies: a UUIDv7
+generated today renders in 21 characters, while a random UUIDv4 usually
+renders in 22.
 
 ## Error Handling
 
