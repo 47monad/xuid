@@ -12,14 +12,16 @@ import (
 )
 
 func TestXUIDValue(t *testing.T) {
-	t.Run("returns UUID string for valid XUID", func(t *testing.T) {
+	t.Run("returns raw UUID bytes for valid XUID", func(t *testing.T) {
 		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
 		id, _ := xuid.NewWith(testUUID, "user")
 
 		value, err := id.Value()
 
 		require.NoError(t, err)
-		assert.Equal(t, testUUID.String(), value)
+		assert.Equal(t, testUUID[:], value)
+		assert.IsType(t, []byte{}, value)
+		assert.Len(t, value, 16)
 	})
 
 	t.Run("returns nil for nil UUID", func(t *testing.T) {
@@ -236,9 +238,9 @@ func TestSQLUsagePatterns(t *testing.T) {
 		userValue, _ := userID.Value()
 		orderValue, _ := orderID.Value()
 
-		// These would be stored as UUID columns in PostgreSQL
-		assert.IsType(t, "", userValue)
-		assert.IsType(t, "", orderValue)
+		// These would be stored as binary UUID columns in PostgreSQL
+		assert.IsType(t, []byte{}, userValue)
+		assert.IsType(t, []byte{}, orderValue)
 
 		// 3. Load from database
 		var loadedUserID, loadedOrderID xuid.XUID
