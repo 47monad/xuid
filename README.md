@@ -233,8 +233,8 @@ the zero value, mirroring how JSON uses `null` and SQL uses `NULL`.
 
 XUIDs integrate seamlessly with SQL databases such as PostgreSQL and MySQL. However, there are a few caveats to keep in mind:
 
-- **Only the UUID bytes are stored** — The 16-byte UUID is stored in the database as a []byte (e.g., BYTEA in PostgreSQL or BINARY(16) in MySQL). This ensures efficient storage and indexing.
-- **Prefixes are not stored** — Scanning a database value yields a XUID with an empty prefix. Restore the prefix with `WithPrefix`/`MustWithPrefix` in your repository/DAO layer, based on the table or column the value was read from:
+- **Only the UUID bytes are stored** — `Value` writes the 16-byte UUID as a `[]byte` (e.g., BYTEA in PostgreSQL or BINARY(16) in MySQL). This ensures efficient storage and indexing.
+- **Prefixes are not stored** — A binary or UUID-format value carries no prefix, so scanning one yields a XUID with an empty prefix. Restore the prefix with `WithPrefix`/`MustWithPrefix` in your repository/DAO layer, based on the table or column the value was read from:
 
 ```go
 // Load from database
@@ -249,6 +249,17 @@ if restored, err := loaded.WithPrefix("user"); err != nil {
     // invalid prefix
 }
 ```
+
+`Scan` accepts the shapes drivers deliver UUID columns in:
+
+- a `string` in UUID format or in the package's own XUID format (`user_Cf1k9VmUZGg55baoJFXnT`),
+- a `[]byte` holding either of those textual forms (e.g., lib/pq),
+- a `[]byte` of exactly 16 raw UUID bytes,
+- a `[16]byte` or `uuid.UUID` (e.g., pgx's native UUID type).
+
+A `[]byte` of exactly 16 bytes is ambiguous: it can be the raw UUID bytes written by `Value` or a 16-character textual identifier — most notably `"1111111111111111"`, the canonical string form of the nil UUID. `Scan` prefers the text interpretation when the bytes are valid UUID/XUID text and otherwise treats them as raw UUID bytes, so a 16-character text column is never silently misread. The reverse case — a raw 16-byte UUID whose bytes happen to form valid XUID text — is astronomically rare; pass it as a `[16]byte` or `uuid.UUID` to force the raw interpretation.
+
+Scanning an XUID-format value (or a `[]byte` holding one) preserves the prefix it encodes. UUID-format and binary values cannot: the prefix is not stored in a binary column.
 
 `WithPrefix` validates the prefix exactly like the constructors and `Parse`, and returns `(XUID, error)`. It is immutable: it returns a copy. Like the constructors, it rejects a non-empty prefix on the nil UUID (`ErrNilUUIDWithPrefix`). `MustWithPrefix` is the panic-on-error variant, so it chains off any value, including non-addressable ones such as `xuid.MustParse(s).MustWithPrefix("user")`. The older `SetPrefix` method is deprecated and does not validate (and does not enforce the nil-UUID/prefix invariant).
 

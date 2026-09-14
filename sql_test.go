@@ -86,6 +86,69 @@ func TestXUIDScan(t *testing.T) {
 		assert.Equal(t, "", id.GetPrefix()) // Prefix is lost when scanning
 	})
 
+	t.Run("scans the package's own XUID string format", func(t *testing.T) {
+		original := xuid.MustNewSortable("user")
+		var id xuid.XUID
+
+		err := id.Scan(original.String())
+
+		require.NoError(t, err)
+		assert.Equal(t, original.GetUUID(), id.GetUUID())
+		assert.Equal(t, "user", id.GetPrefix()) // XUID text preserves the prefix
+		assert.True(t, original.Equal(id))
+	})
+
+	t.Run("scans an unprefixed XUID string", func(t *testing.T) {
+		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
+		original, _ := xuid.NewWith(testUUID, "")
+		var id xuid.XUID
+
+		err := id.Scan(original.String())
+
+		require.NoError(t, err)
+		assert.Equal(t, testUUID, id.GetUUID())
+		assert.Equal(t, "", id.GetPrefix())
+	})
+
+	t.Run("scans an XUID string delivered as a byte slice", func(t *testing.T) {
+		original := xuid.MustNewSortable("order")
+		var id xuid.XUID
+
+		err := id.Scan([]byte(original.String()))
+
+		require.NoError(t, err)
+		assert.True(t, original.Equal(id))
+	})
+
+	t.Run("scans 16-byte XUID text instead of raw bytes", func(t *testing.T) {
+		// Regression test: "1111111111111111" is the canonical string
+		// form of the nil XUID and is exactly 16 bytes long. It must be
+		// parsed as that (empty) identifier, not as the raw bytes 0x31...,
+		// which would silently yield a different, valid-looking UUID.
+		var id xuid.XUID
+
+		err := id.Scan([]byte("1111111111111111"))
+
+		require.NoError(t, err)
+		assert.Equal(t, uuid.Nil(), id.GetUUID())
+		assert.True(t, xuid.IsEmpty(id))
+	})
+
+	t.Run("scans a 16-byte non-nil XUID text", func(t *testing.T) {
+		// A UUID with 15 leading zero bytes encodes to the 16-character
+		// XUID string "1111111111111112".
+		testUUID, _ := uuid.Parse("00000000-0000-0000-0000-000000000001")
+		original, _ := xuid.NewWith(testUUID, "")
+		require.Len(t, original.String(), 16, "regression fixture must be 16 bytes")
+
+		var id xuid.XUID
+		err := id.Scan([]byte(original.String()))
+
+		require.NoError(t, err)
+		assert.Equal(t, testUUID, id.GetUUID())
+		assert.Equal(t, "", id.GetPrefix())
+	})
+
 	t.Run("scans 16-byte array successfully", func(t *testing.T) {
 		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
 		var raw [16]byte
@@ -198,9 +261,11 @@ func TestNullXUID(t *testing.T) {
 	t.Run("Scan accepts the shapes XUID.Scan accepts", func(t *testing.T) {
 		testUUID, _ := uuid.Parse("550e8400-e29b-41d4-a716-446655440000")
 		raw := testUUID[:]
+		unprefixed, _ := xuid.NewWith(testUUID, "")
 
 		values := map[string]interface{}{
 			"uuid string":   testUUID.String(),
+			"xuid string":   unprefixed.String(),
 			"raw bytes":     raw,
 			"16-byte array": [16]byte(raw),
 			"uuid.UUID":     testUUID,
