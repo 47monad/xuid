@@ -50,9 +50,10 @@ func (n NullXUID) Value() (driver.Value, error) {
 // false and leaves the XUID at its zero value. Any supported non-NULL value
 // is scanned with XUID.Scan and sets Valid to true.
 //
-// As with XUID.Scan, the prefix is not stored in the database and is lost
-// when scanning; restore it with WithPrefix or MustWithPrefix based on the
-// table or column the value was read from.
+// As with XUID.Scan, a UUID-format or binary value carries no prefix and
+// scanning it yields an empty prefix; an XUID-format value preserves its
+// prefix. Restore a lost prefix with WithPrefix or MustWithPrefix based on
+// the table or column the value was read from.
 func (n *NullXUID) Scan(value interface{}) error {
 	if value == nil {
 		n.XUID = XUID{}
@@ -76,14 +77,24 @@ func (n *NullXUID) Scan(value interface{}) error {
 //
 // It accepts the shapes drivers actually deliver UUID columns in:
 //
-//   - string in UUID format
+//   - string in UUID format or in the package's own XUID format
 //   - []byte of exactly 16 raw bytes
-//   - []byte containing a UUID string (e.g. lib/pq)
+//   - []byte containing a UUID or XUID string (e.g. lib/pq)
 //   - [16]byte or uuid.UUID (e.g. pgx's native UUID type)
 //
-// Note: The prefix information is lost when loading from database.
-// Restore prefixes with WithPrefix or MustWithPrefix after loading, based
-// on the table or column the value was read from:
+// A []byte of exactly 16 bytes is ambiguous: it may be the raw UUID bytes
+// written by Value, or a 16-byte textual identifier such as the canonical
+// form of the nil UUID, "1111111111111111". Scan prefers the text
+// interpretation when the bytes are valid UUID/XUID text and otherwise
+// treats them as raw UUID bytes, so text columns are read correctly.
+// The trade-off is that the astronomically rare raw 16-byte UUID whose
+// bytes also form valid XUID text is read as that text; pass such a value
+// as a [16]byte or uuid.UUID to force the raw interpretation.
+//
+// A UUID-format value never carries a prefix, so scanning one yields an
+// empty prefix. An XUID-format value preserves the prefix it encodes.
+// Binary columns store no prefix, so restore one with WithPrefix or
+// MustWithPrefix based on the table or column the value was read from:
 //
 //	var loaded xuid.XUID
 //	loaded.Scan(value)
@@ -97,29 +108,24 @@ func (x *XUID) Scan(value interface{}) error {
 
 	switch d := value.(type) {
 	case string:
-		id, err := uuid.Parse(d)
-		if err != nil {
-			return fmt.Errorf("%w: invalid UUID string %q", ErrScan, d)
+		if x.scanText(d) {
+			return nil
 		}
-		x.uuid = id
-		x.prefix = ""
-		return nil
+		return fmt.Errorf("%w: invalid UUID string %q", ErrScan, d)
 	case []byte:
-		var id uuid.UUID
-		if len(d) == 16 {
-			copy(id[:], d)
-		} else {
-			// Drivers such as lib/pq deliver UUID columns as a []byte
-			// holding the textual form rather than the 16 raw bytes.
-			var err error
-			id, err = uuid.Parse(string(d))
-			if err != nil {
-				return fmt.Errorf("%w: invalid UUID bytes %q", ErrScan, d)
-			}
+		// A []byte of exactly 16 bytes is ambiguous between the raw UUID
+		// bytes written by Value and 16-byte XUID text, so try the text
+		// form first and fall back to raw bytes. Drivers such as lib/pq
+		// deliver text columns as a []byte rather than a string.
+		if x.scanText(string(d)) {
+			return nil
 		}
-		x.uuid = id
-		x.prefix = "" // Prefix is lost when loading from database
-		return nil
+		if len(d) == 16 {
+			copy(x.uuid[:], d)
+			x.prefix = ""
+			return nil
+		}
+		return fmt.Errorf("%w: invalid UUID bytes %q", ErrScan, d)
 	case [16]byte:
 		x.uuid = uuid.UUID(d)
 		x.prefix = ""
@@ -131,4 +137,23 @@ func (x *XUID) Scan(value interface{}) error {
 	}
 
 	return fmt.Errorf("%w: unsupported type %T", ErrScan, value)
+}
+
+// scanText sets x from s if s is either a UUID-format string or one of the
+// package's own XUID strings, and reports whether it succeeded. The UUID
+// format is tried first: it is unambiguous and cannot collide with an XUID
+// string, since XUID strings never contain hyphens and never exceed
+// maxEncodedLen base58 digits (plus an optional prefix).
+func (x *XUID) scanText(s string) bool {
+	if id, err := uuid.Parse(s); err == nil {
+		x.uuid = id
+		x.prefix = ""
+		return true
+	}
+	if id, err := Parse(s); err == nil {
+		x.uuid = id.uuid
+		x.prefix = id.prefix
+		return true
+	}
+	return false
 }
