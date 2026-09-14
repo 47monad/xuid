@@ -17,10 +17,21 @@ A Go package for generating compact, sortable UUID-based identifiers with option
 - 🗄️ **SQL Database Support**: Seamless integration with SQL databases (PostgreSQL, MySQL, etc.)
 - ✅ **Type Safety**: Strong typing with validation and parsing utilities
 
+## Requirements
+
+- Go 1.27 or newer. The package uses the standard library `uuid` package, which
+  was added in Go 1.27.
+
 ## Installation
 
 ```bash
 go get github.com/47monad/xuid
+```
+
+To pin a specific release:
+
+```bash
+go get github.com/47monad/xuid@v0.1.0
 ```
 
 ## Quick Start
