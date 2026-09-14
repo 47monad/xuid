@@ -234,6 +234,27 @@ renders the nil UUID as the empty string too, so an unset identifier is obvious
 in logs rather than looking like a real one. `Parse` rejects the empty string,
 so test for the nil UUID with `IsEmpty` instead of parsing `String`.
 
+### Gob Support
+
+`XUID` implements `gob.GobEncoder` and `gob.GobDecoder`, so it works with
+`encoding/gob` (RPC, caches, session stores) even though its fields are
+unexported:
+
+```go
+var buf bytes.Buffer
+if err := gob.NewEncoder(&buf).Encode(id); err != nil {
+    log.Fatal(err)
+}
+
+var loaded xuid.XUID
+if err := gob.NewDecoder(&buf).Decode(&loaded); err != nil {
+    log.Fatal(err)
+}
+```
+
+The gob encoding is the canonical text form used by `MarshalText`, so prefixes
+are preserved and the nil UUID round-trips as the empty value.
+
 ### SQL Support
 
 XUIDs integrate seamlessly with SQL databases such as PostgreSQL and MySQL. However, there are a few caveats to keep in mind:
