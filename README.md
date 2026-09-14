@@ -208,6 +208,12 @@ var parsed User
 json.Unmarshal(data, &parsed)
 ```
 
+A zero-value XUID marshals to `null`, and unmarshalling `null` is a **no-op**: it
+leaves the destination unchanged rather than clearing it, matching `time.Time`
+and other non-pointer `json.Unmarshaler` types. This keeps a payload such as
+`{"id":null}` from silently wiping a previously-set identifier. To clear a value
+explicitly, unmarshal an empty JSON string (`""`), which maps to the zero value.
+
 ### Text Support
 
 `XUID` implements `encoding.TextMarshaler` and `encoding.TextUnmarshaler`, so it

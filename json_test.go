@@ -77,7 +77,7 @@ func TestXUIDUnmarshalJSON(t *testing.T) {
 		assert.Equal(t, "", id.GetPrefix())
 	})
 
-	t.Run("unmarshals null to zero-value XUID", func(t *testing.T) {
+	t.Run("unmarshalling null into the zero value leaves it empty", func(t *testing.T) {
 		var id xuid.XUID
 
 		err := json.Unmarshal([]byte("null"), &id)
@@ -88,10 +88,34 @@ func TestXUIDUnmarshalJSON(t *testing.T) {
 		assert.True(t, xuid.IsEmpty(id))
 	})
 
-	t.Run("unmarshals null over existing value resets to zero-value XUID", func(t *testing.T) {
-		id := xuid.MustNewSortable("user")
+	t.Run("unmarshalling null leaves an existing value unchanged", func(t *testing.T) {
+		original := xuid.MustNewSortable("user")
+		id := original
 
 		err := json.Unmarshal([]byte("null"), &id)
+
+		require.NoError(t, err)
+		assert.True(t, original.Equal(id))
+		assert.Equal(t, "user", id.GetPrefix())
+	})
+
+	t.Run("unmarshalling null leaves an existing struct field unchanged", func(t *testing.T) {
+		type user struct {
+			ID xuid.XUID `json:"id"`
+		}
+		original := user{ID: xuid.MustNewSortable("user")}
+		got := original
+
+		err := json.Unmarshal([]byte(`{"id":null}`), &got)
+
+		require.NoError(t, err)
+		assert.True(t, original.ID.Equal(got.ID))
+	})
+
+	t.Run("unmarshalling an empty string clears the value", func(t *testing.T) {
+		id := xuid.MustNewSortable("user")
+
+		err := json.Unmarshal([]byte(`""`), &id)
 
 		require.NoError(t, err)
 		assert.True(t, xuid.IsEmpty(id))
