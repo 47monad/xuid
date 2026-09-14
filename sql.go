@@ -83,8 +83,9 @@ func (n *NullXUID) Scan(value interface{}) error {
 //   - [16]byte or uuid.UUID (e.g. pgx's native UUID type)
 //
 // A []byte of exactly 16 bytes is ambiguous: it may be the raw UUID bytes
-// written by Value, or a 16-byte textual identifier such as the canonical
-// form of the nil UUID, "1111111111111111". Scan prefers the text
+// written by Value, or a 16-byte textual identifier such as the base58
+// form of the nil UUID, "1111111111111111" (which Parse still accepts).
+// Scan prefers the text
 // interpretation when the bytes are valid UUID/XUID text and otherwise
 // treats them as raw UUID bytes, so text columns are read correctly.
 // The trade-off is that the astronomically rare raw 16-byte UUID whose

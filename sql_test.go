@@ -121,10 +121,10 @@ func TestXUIDScan(t *testing.T) {
 	})
 
 	t.Run("scans 16-byte XUID text instead of raw bytes", func(t *testing.T) {
-		// Regression test: "1111111111111111" is the canonical string
-		// form of the nil XUID and is exactly 16 bytes long. It must be
-		// parsed as that (empty) identifier, not as the raw bytes 0x31...,
-		// which would silently yield a different, valid-looking UUID.
+		// Regression test: "1111111111111111" is the base58 string form
+		// of the nil XUID and is exactly 16 bytes long. It must be parsed
+		// as that (empty) identifier, not as the raw bytes 0x31..., which
+		// would silently yield a different, valid-looking UUID.
 		var id xuid.XUID
 
 		err := id.Scan([]byte("1111111111111111"))

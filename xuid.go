@@ -226,7 +226,19 @@ func (x *XUID) SetPrefix(prefix string) *XUID {
 	return x
 }
 
+// String returns the canonical string form of x: its optional prefix,
+// followed by an underscore and the base58-encoded UUID.
+//
+// The nil UUID (the zero-value XUID) renders as the empty string, the
+// same form MarshalText, JSON and SQL use for it, so an unset identifier
+// is obvious in logs instead of looking like a real one. Parse rejects
+// the empty string by design, so the nil UUID does not round-trip
+// through String and Parse; detect it with IsEmpty, or use MarshalText
+// and UnmarshalText, which do round-trip.
 func (x XUID) String() string {
+	if x.uuid == uuid.Nil() {
+		return ""
+	}
 	if x.prefix == "" {
 		return encodeBase58(x.uuid[:])
 	}

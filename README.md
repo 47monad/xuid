@@ -98,7 +98,9 @@ A nil UUID represents an absent identifier and never carries a prefix. `NewWith`
 rejects a non-empty prefix on the nil UUID (wrapping `ErrNilUUIDWithPrefix`),
 and `Parse` rejects strings such as `user_1111111111111111` whose decoded UUID
 is the nil UUID. This keeps the nil UUID encodable as `null`/empty by JSON, text
-and SQL without losing information.
+and SQL without losing information. `String` likewise renders the nil UUID as the
+empty string; `Parse` rejects the empty string, so test for a nil UUID with
+`IsEmpty` (or use `MarshalText`/`UnmarshalText`, which round-trip it).
 
 ### Working with XUIDs
 
@@ -227,7 +229,10 @@ loaded.UnmarshalText(text)
 ```
 
 A zero-value XUID marshals to an empty string, and an empty string unmarshals to
-the zero value, mirroring how JSON uses `null` and SQL uses `NULL`.
+the zero value, mirroring how JSON uses `null` and SQL uses `NULL`. `String`
+renders the nil UUID as the empty string too, so an unset identifier is obvious
+in logs rather than looking like a real one. `Parse` rejects the empty string,
+so test for the nil UUID with `IsEmpty` instead of parsing `String`.
 
 ### SQL Support
 
@@ -257,7 +262,7 @@ if restored, err := loaded.WithPrefix("user"); err != nil {
 - a `[]byte` of exactly 16 raw UUID bytes,
 - a `[16]byte` or `uuid.UUID` (e.g., pgx's native UUID type).
 
-A `[]byte` of exactly 16 bytes is ambiguous: it can be the raw UUID bytes written by `Value` or a 16-character textual identifier — most notably `"1111111111111111"`, the canonical string form of the nil UUID. `Scan` prefers the text interpretation when the bytes are valid UUID/XUID text and otherwise treats them as raw UUID bytes, so a 16-character text column is never silently misread. The reverse case — a raw 16-byte UUID whose bytes happen to form valid XUID text — is astronomically rare; pass it as a `[16]byte` or `uuid.UUID` to force the raw interpretation.
+A `[]byte` of exactly 16 bytes is ambiguous: it can be the raw UUID bytes written by `Value` or a 16-character textual identifier — most notably `"1111111111111111"`, the base58 form of the nil UUID (`Parse` still accepts it even though `String` renders the nil UUID as empty). `Scan` prefers the text interpretation when the bytes are valid UUID/XUID text and otherwise treats them as raw UUID bytes, so a 16-character text column is never silently misread. The reverse case — a raw 16-byte UUID whose bytes happen to form valid XUID text — is astronomically rare; pass it as a `[16]byte` or `uuid.UUID` to force the raw interpretation.
 
 Scanning an XUID-format value (or a `[]byte` holding one) preserves the prefix it encodes. UUID-format and binary values cannot: the prefix is not stored in a binary column.
 
@@ -299,6 +304,12 @@ XUIDs follow this format:
 
 - **Without prefix**: `Cf1k9VmUZGg55baoJFXnT`
 - **With prefix**: `prefix_Cf1k9VmUZGg55baoJFXnT`
+
+The nil UUID (the zero-value XUID) is the exception: `String` renders it as the
+empty string, matching its empty/null JSON, text and SQL encodings, so an unset
+identifier is obvious rather than plausible-looking. `Parse` deliberately rejects
+the empty string, so the nil UUID does not round-trip through `String`/`Parse`;
+use `IsEmpty` to detect it, or `MarshalText`/`UnmarshalText`, which do round-trip.
 
 Prefixes are validated by every constructor and by `Parse`:
 
