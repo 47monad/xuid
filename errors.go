@@ -27,10 +27,11 @@ var (
 	// detected with errors.Is(err, ErrNilUUIDWithPrefix).
 	ErrNilUUIDWithPrefix = errors.New("XUID cannot combine the nil UUID with a prefix")
 
-	// ErrNotSortable is returned by Time when the XUID does not embed a
-	// UUIDv7 timestamp, such as a UUIDv4 or the nil UUID. Time wraps it
-	// with context, so failures can be detected with
-	// errors.Is(err, ErrNotSortable), and IsSortable can be used to check
-	// first.
+	// ErrNotSortable is returned by Time when the XUID is not a
+	// well-formed UUIDv7, such as a UUIDv4, the nil UUID, or a value
+	// whose version nibble is 7 but whose variant is not the RFC 9562
+	// variant. Time wraps it with context, so failures can be detected
+	// with errors.Is(err, ErrNotSortable), and IsSortable can be used to
+	// check first.
 	ErrNotSortable = errors.New("XUID does not embed a sortable timestamp")
 )
