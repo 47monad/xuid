@@ -159,6 +159,18 @@ func TestXUIDString(t *testing.T) {
 		assert.NotContains(t, str, "_")
 		assert.NotEmpty(t, str)
 	})
+
+	t.Run("returns the empty string for the nil UUID", func(t *testing.T) {
+		id, _ := xuid.NilUUID()
+
+		assert.Equal(t, "", id.String())
+	})
+
+	t.Run("returns the empty string for the zero value", func(t *testing.T) {
+		var id xuid.XUID
+
+		assert.Equal(t, "", id.String())
+	})
 }
 
 func TestXUIDEqual(t *testing.T) {
@@ -899,12 +911,13 @@ func BenchmarkWithPrefix(b *testing.B) {
 	}
 }
 
-// FuzzParseRoundTrip asserts that every XUID survives a String/Parse
+// FuzzParseRoundTrip asserts that every non-nil XUID survives a String/Parse
 // round trip: Parse(x.String()) must equal x. It fuzzes both the prefix
 // (including underscores and non-ASCII runes) and the raw UUID bytes, so
 // malformed prefixes or encodings cannot silently corrupt an identifier.
 // Inputs with a prefix that fails validation are skipped, since they
-// cannot be constructed in the first place.
+// cannot be constructed in the first place. The nil UUID is checked
+// separately: its canonical form is the empty string, which Parse rejects.
 func FuzzParseRoundTrip(f *testing.F) {
 	// Unprefixed nil UUID.
 	f.Add("", []byte{})
@@ -937,6 +950,13 @@ func FuzzParseRoundTrip(f *testing.F) {
 			return
 		}
 
+		if xuid.IsEmpty(original) {
+			// The nil UUID renders as the empty string, which Parse
+			// rejects by design, so it has no String/Parse round trip.
+			assert.Equal(t, "", original.String())
+			return
+		}
+
 		parsed, err := xuid.Parse(original.String())
 		require.NoError(t, err)
 		assert.True(t, original.Equal(parsed),
@@ -946,7 +966,8 @@ func FuzzParseRoundTrip(f *testing.F) {
 
 // FuzzParseNoPanic asserts the failure contract of Parse on arbitrary
 // input: it never panics, every rejected string produces an error that
-// wraps ErrParse, and anything it accepts survives a String/Parse round
+// wraps ErrParse, and anything it accepts is either the nil UUID (whose
+// canonical form is the empty string) or survives a String/Parse round
 // trip. Inputs are decoded byte-for-byte, so non-ASCII and overlong
 // strings are exercised alongside well-formed identifiers.
 func FuzzParseNoPanic(f *testing.F) {
@@ -978,7 +999,13 @@ func FuzzParseNoPanic(f *testing.F) {
 		}
 
 		assert.True(t, xuid.IsValid(s))
-		// Anything Parse accepts must round-trip through String.
+		if xuid.IsEmpty(got) {
+			// The nil UUID renders as the empty string, which Parse
+			// rejects by design, so it has no String/Parse round trip.
+			assert.Equal(t, "", got.String())
+			return
+		}
+		// Anything else Parse accepts must round-trip through String.
 		assert.True(t, xuid.MustParse(got.String()).Equal(got),
 			"round trip mismatch for %q", s)
 	})
