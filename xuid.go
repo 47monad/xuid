@@ -121,28 +121,45 @@ func (x XUID) GetUUID() uuid.UUID {
 	return x.uuid
 }
 
-func (x XUID) IsSortable() bool {
-	return x.uuid[6]>>4 == 7
+// hasRFCVariant reports whether id uses the RFC 9562 variant, i.e. the
+// two most significant bits of octet 8 are 0b10 (10xx). Values with the
+// NCS, Microsoft or future variant are not RFC 9562 UUIDs.
+func hasRFCVariant(id uuid.UUID) bool {
+	return id[8]&0xc0 == 0x80
 }
 
+// IsSortable reports whether x is a well-formed UUIDv7 identifier, i.e.
+// its version nibble is 7 and it carries the RFC 9562 variant. Only then
+// does it embed a trustworthy 48-bit timestamp, so a foreign or malformed
+// UUID that merely has a 7 in the version nibble is not reported as
+// sortable and Time will not trust its timestamp.
+func (x XUID) IsSortable() bool {
+	return x.uuid[6]>>4 == 7 && hasRFCVariant(x.uuid)
+}
+
+// IsRandom reports whether x is a well-formed UUIDv4 identifier, i.e.
+// its version nibble is 4 and it carries the RFC 9562 variant. As with
+// IsSortable, the variant bits are checked so a foreign UUID is not
+// mistaken for one this package generates.
 func (x XUID) IsRandom() bool {
-	return x.uuid[6]>>4 == 4
+	return x.uuid[6]>>4 == 4 && hasRFCVariant(x.uuid)
 }
 
 // Time returns the instant encoded in a UUIDv7 identifier's 48-bit
 // millisecond timestamp. Because NewSortable generates UUIDv7 identifiers,
 // their Time is the moment the identifier was created.
 //
-// It returns the zero time and an error wrapping ErrNotSortable if x does
-// not embed a UUIDv7 timestamp, such as a UUIDv4 or the nil UUID. Use
-// IsSortable to check first when a zero time is not an option:
+// It returns the zero time and an error wrapping ErrNotSortable if x is
+// not a well-formed UUIDv7, such as a UUIDv4, the nil UUID, or a value
+// whose variant is not the RFC 9562 variant. Use IsSortable to check
+// first when a zero time is not an option:
 //
 //	if id.IsSortable() {
 //		created, _ := id.Time()
 //	}
 func (x XUID) Time() (time.Time, error) {
 	if !x.IsSortable() {
-		return time.Time{}, fmt.Errorf("%w: UUID version is not 7", ErrNotSortable)
+		return time.Time{}, fmt.Errorf("%w: UUID is not a valid UUIDv7", ErrNotSortable)
 	}
 	ms := int64(x.uuid[0])<<40 |
 		int64(x.uuid[1])<<32 |

@@ -564,6 +564,30 @@ func TestVersionChecking(t *testing.T) {
 		assert.False(t, id.IsSortable())
 		assert.False(t, id.IsRandom())
 	})
+
+	t.Run("rejects version 7 with a non-RFC variant", func(t *testing.T) {
+		// The variant is the top two bits of octet 8; RFC 9562 is 10xx.
+		// NCS (0xxx), Microsoft (110x) and future (111x) are not RFC.
+		for _, variant := range []byte{0x00, 0x40, 0xc0, 0xe0} {
+			raw := uuid.NewV7()
+			raw[8] = variant
+
+			id, err := xuid.NewWith(raw, "")
+			require.NoError(t, err)
+			assert.False(t, id.IsSortable(), "variant %#02x must not be sortable", variant)
+		}
+	})
+
+	t.Run("rejects version 4 with a non-RFC variant", func(t *testing.T) {
+		for _, variant := range []byte{0x00, 0x40, 0xc0, 0xe0} {
+			raw := uuid.NewV4()
+			raw[8] = variant
+
+			id, err := xuid.NewWith(raw, "")
+			require.NoError(t, err)
+			assert.False(t, id.IsRandom(), "variant %#02x must not be random", variant)
+		}
+	})
 }
 
 func TestTime(t *testing.T) {
@@ -603,6 +627,19 @@ func TestTime(t *testing.T) {
 		id, _ := xuid.NewRandom("session")
 
 		_, err := id.Time()
+
+		assert.ErrorIs(t, err, xuid.ErrNotSortable)
+	})
+
+	t.Run("returns ErrNotSortable for version 7 with a non-RFC variant", func(t *testing.T) {
+		raw := uuid.NewV7()
+		raw[8] = 0x00 // NCS variant, not RFC 9562
+
+		id, err := xuid.NewWith(raw, "")
+		require.NoError(t, err)
+		require.False(t, id.IsSortable())
+
+		_, err = id.Time()
 
 		assert.ErrorIs(t, err, xuid.ErrNotSortable)
 	})

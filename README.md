@@ -120,11 +120,11 @@ uuid := id.GetUUID()
 // Get the prefix
 prefix := id.GetPrefix() // "user"
 
-// Check UUID version
-isSortable := id.IsSortable() // true for UUIDv7
-isRandom := id.IsRandom()     // true for UUIDv4
+// Check UUID version and variant (both must be RFC 9562)
+isSortable := id.IsSortable() // true for well-formed UUIDv7
+isRandom := id.IsRandom()     // true for well-formed UUIDv4
 
-// Extract the creation instant from a UUIDv7 (errors for other versions)
+// Extract the creation instant from a UUIDv7 (errors for anything else)
 created, err := id.Time()
 ```
 
