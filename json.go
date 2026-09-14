@@ -22,8 +22,9 @@ func (x XUID) MarshalText() ([]byte, error) {
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
 //
-// An empty string maps to the zero-value XUID, mirroring the behavior
-// of Scan and UnmarshalJSON. Any other value must be a valid XUID string.
+// An empty string maps to the zero-value XUID, so the empty form that
+// MarshalText produces for the nil UUID round-trips. Any other value
+// must be a valid XUID string.
 func (x *XUID) UnmarshalText(data []byte) error {
 	if len(data) == 0 {
 		x.uuid = uuid.Nil()
@@ -56,13 +57,15 @@ func (x XUID) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
 //
-// null is accepted and maps to the zero-value XUID, mirroring the
-// behavior of Scan for SQL storage. Any other value must be a string
-// holding a valid XUID. It delegates to UnmarshalText so that
-// null/empty handling lives in one place.
+// A JSON null is a no-op: it leaves x unchanged, matching the convention
+// of time.Time and other non-pointer json.Unmarshaler types, so decoding
+// a payload such as {"id":null} does not wipe a previously-set value.
+// Any other value must be a JSON string holding a valid XUID; an empty
+// string maps to the zero-value XUID, so it remains possible to clear a
+// value explicitly.
 func (x *XUID) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
-		return x.UnmarshalText(nil)
+		return nil
 	}
 	var res string
 	if err := json.Unmarshal(data, &res); err != nil {
